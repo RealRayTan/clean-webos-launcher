@@ -5,7 +5,8 @@ import shlex
 import subprocess
 from tv_control import ROOT, call, remote, ssh_args
 
-package = ROOT / 'build/com.gathin.tvhome_1.0.7_all.ipk'
+version = json.loads((ROOT / 'app/appinfo.json').read_text())['version']
+package = ROOT / ('build/com.gathin.tvhome_' + version + '_all.ipk')
 if not package.is_file():
     raise SystemExit('Run scripts/build.sh first')
 
