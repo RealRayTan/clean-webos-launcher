@@ -4,6 +4,18 @@
 
 本项目基于 [webos-vibehack](https://github.com/OmkarK97/webos-vibehack)，补充中文字体回退、电视端按键助手和界面恢复。不需要电脑常开。
 
+## 界面对比
+
+2026-10-21 在同一台 LG C5 上截取，项目桌面版本为 1.0.7。点击图片可查看原尺寸。
+
+| LG 原厂首页 | 项目中文桌面 |
+|---|---|
+| [![LG 原厂首页，包含推荐横幅和内容列表](docs/images/lg-home.png)](docs/images/lg-home.png) | [![项目中文桌面，突出时钟和常用应用](docs/images/custom-home.png)](docs/images/custom-home.png) |
+
+新桌面把时钟、常用应用和输入源入口放在首屏，不显示原厂首页的推荐内容。中文日期、问候语与菜单均来自当前界面，两张图均为原始实机截图。原厂首页仍可通过长按 Home 打开。
+
+静态截图只展示布局。Home 无闪回与界面恢复的验证范围见 [验证记录](docs/verification.md)。
+
 ## 当前行为
 
 | 操作 | 结果 |
