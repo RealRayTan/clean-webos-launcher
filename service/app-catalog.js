@@ -13,6 +13,24 @@ function iconData(file) {
 }
 
 exports.register = function (service) {
+  service.register('vpnStatus', function (message) {
+    if (message.sender !== 'com.gathin.tvhome') {
+      message.respond({ returnValue: false, errorText: 'Caller not allowed' });
+      return;
+    }
+    require('child_process').execFile('/usr/bin/luna-send', [
+      '-a', 'com.alcyone.vpn.singbox', '-n', '1', '-w', '3500',
+      'luna://com.alcyone.vpn.singbox.service/getState', '{}'
+    ], { timeout: 4500, maxBuffer: 65536 }, function (error, output) {
+      var state;
+      try { state = JSON.parse(output); } catch (invalid) {}
+      if (error || !state || !state.returnValue || !state.vpn) {
+        message.respond({ returnValue: false, errorText: 'VPN 状态暂不可用' });
+        return;
+      }
+      message.respond({ returnValue: true, connected: state.vpn.connected === true && state.vpn.state === 'connected' });
+    });
+  });
   service.register('listApps', function (message) {
     var finished = false;
     var timer = setTimeout(function () { finish({ returnValue: false, errorText: '应用列表读取超时' }); }, 7000);

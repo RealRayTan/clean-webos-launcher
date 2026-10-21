@@ -19,3 +19,6 @@ native-artifacts/
 .native-build/
 app/icons/*.png
 app/apps.js
+
+# Local design explorations and screenshots
+previews/

@@ -37,9 +37,9 @@ ssh -i "$TV_SSH_KEY" "root@$TV_HOST" id
 .venv/bin/python tools/sync-apps.py "$TV_HOST"
 ```
 
-首次配对会在电视上显示连接提示。允许后，配对凭据仅保存在本地、已被 Git 忽略的 `tools/.lgtv-key.json`。同步得到的 `app/apps.js` 是安装时快照，1.0.9 通过电视端助手刷新应用列表，新增应用后不必重新打包；此快照仅用于读取失败时回退。该文件会包含你的应用清单，已被 Git 忽略。仓库只跟踪 `app/apps.example.js` 示例。
+首次配对会在电视上显示连接提示。允许后，配对凭据仅保存在本地、已被 Git 忽略的 `tools/.lgtv-key.json`。同步得到的 `app/apps.js` 是安装时快照，1.1.0 通过电视端助手刷新应用列表，新增应用后不必重新打包；此快照仅用于读取失败时回退。该文件会包含你的应用清单，已被 Git 忽略。仓库只跟踪 `app/apps.example.js` 示例。
 
-2. 在 `app/config.js` 的 `dockApps` 中填入要固定的应用 ID。默认数组为空。
+2. 在 `app/config.js` 的 `computerInput` 中指定常用输入源，默认 HDMI 4。首页应用安装后在“编辑桌面”中选择。
 3. 从 [原生依赖来源](native.md) 所列的固定构建记录取得 ARM32 产物，解压后验证并复制。
 
 ```sh
@@ -52,7 +52,7 @@ python3 scripts/prepare_native.py /absolute/path/to/native-artifact
 bash scripts/build.sh
 ```
 
-输出为 `build/com.gathin.tvhome_1.0.9_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
+输出为 `build/com.gathin.tvhome_1.1.0_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
 
 ## 安装并启用
 

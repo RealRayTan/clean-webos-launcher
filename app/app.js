@@ -1,733 +1,329 @@
-/*
- * tvOS style home for webOS: black, a pinned dock row, an app grid, and one glass highlight that
- * springs between tiles. A port of the Android launcher in ../../launcher.
- *
- * The root helper supplies installed apps; apps.js remains the offline fallback.
- */
+/* Local webOS launcher. Device actions use the bounded adapter in device.js. */
 (function () {
   'use strict';
-
-  var idleTimer;
-  function resetIdle() {
-    document.body.classList.remove('idle');
-    clearTimeout(idleTimer);
-    idleTimer = setTimeout(function () { document.body.classList.add('idle'); }, 180000);
-  }
-  ['keydown', 'mousedown', 'mousemove', 'wheel', 'visibilitychange'].forEach(function (event) {
-    document.addEventListener(event, resetIdle);
-  });
-  resetIdle();
-
-  var COLUMNS = Math.max(1, CONFIG.columns || 4);
-  var TILE_W = 360, TILE_H = 202;
-  var CELL_W = (1920 - 2 * 112) / COLUMNS;
-  var ROW_PITCH = 292;
-  var DOCK_TOP = 708;           // tile top of the dock row: next row peeks in at the bottom
-  var DOCK_GAP = 36;            // extra space below the dock
-  var FOCUS_SCALE = 1.1;
-  var GLASS_PAD = 12;           // room for the glass glow around the scaled tile
-  var VIEW_TOP = 80, VIEW_BOTTOM = 1060;    // area grid rows scroll into (the header hides below the dock)
-
-  var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27 };
-
-  var GREETINGS = [[5, '夜深了'], [12, '早上好'], [17, '下午好'], [22, '晚上好'], [24, '夜深了']];
-  var DAYS = ['星期日', '星期一', '星期二', '星期三', '星期四', '星期五', '星期六'];
-  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September',
-    'October', 'November', 'December'];
-
-  var ICON_INPUT = 'M18,7V4c0,-1.1 -0.9,-2 -2,-2H8C6.9,2 6,2.9 6,4v3H5v6l3,6v3h8v-3l3,-6V7H18zM8,4h8v3h-2V5h-1v2h-2V5h-1v2H8V4z';
-  var ICON_LIVETV = 'M21,6h-7.59l3.29,-3.29L16,2l-4,4l-4,-4l-0.71,0.71L10.59,6H3c-1.1,0 -2,0.89 -2,2v12c0,1.1 0.9,2 2,2h18c1.1,0 2,-0.89 2,-2V8C23,6.89 22.1,6 21,6zM21,20H3V8h18V20zM9,10v8l7,-4L9,10z';
-
   var $ = function (id) { return document.getElementById(id); };
-  var stage = $('stage'), tilesEl = $('tiles'), glass = $('glass'), hero = $('hero');
-  var ambients = [$('ambientA'), $('ambientB')], ambientFront = 0, ambientColor = null;
-  var pills = [$('btnApps'), $('btnInputs'), $('btnWifi'), $('btnSettings')];
-  var panel = $('inputsPanel');
-  var appsPanel = $('appsPanel'), appsRows = $('appsRows');
-  var managedFocus = 0, managedRows = [], refreshingApps = false;
-  var hiddenApps;
-  try { hiddenApps = JSON.parse(localStorage.getItem('tvhome.hidden')); } catch (e) {}
-  if (!Array.isArray(hiddenApps)) hiddenApps = (CONFIG.hiddenApps || []).slice();
+  var scene = $('scene'), overlay = $('overlay'), panel = overlay.querySelector('.dialog'), body = $('dialog-body');
+  var KEY = 'tvhome.tiles.v1';
+  var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
+  var vpnId = 'com.alcyone.vpn.singbox';
+  var defaults = ['com.biliwebos.app', 'youtube.leanback.v4', 'netflix', 'com.beb.plxnative', 'com.apple.appletv'];
+  var brands = {
+    'com.biliwebos.app': { name: '哔哩哔哩', subtitle: '视频与番剧', icon: 'bilibili.svg', style: 'bili' },
+    'youtube.leanback.v4': { name: 'YouTube', icon: 'youtube.svg', style: 'youtube' },
+    netflix: { name: 'Netflix', icon: 'netflix.svg', style: 'netflix' },
+    'com.beb.plxnative': { name: 'PlxNative', style: 'plx' },
+    'com.apple.appletv': { name: 'Apple TV', icon: 'appletv.svg', style: 'apple' },
+    amazon: { name: 'Prime Video', style: 'prime' }
+  };
+  function sanitizeApps(value) {
+    if (!Array.isArray(value)) return [];
+    var seen = Object.create(null);
+    return value.filter(function (app) {
+      if (!app || typeof app.id !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(app.id) || seen[app.id] || typeof app.title !== 'string') return false;
+      seen[app.id] = true;
+      return true;
+    }).map(function (app) { return { id: app.id, title: app.title, icon: typeof app.icon === 'string' ? app.icon : '', iconColor: app.iconColor || '' }; });
+  }
+  var catalog = sanitizeApps(window.TV_APPS && TV_APPS.apps);
+  try { var cached = sanitizeApps(JSON.parse(localStorage.getItem('tvhome.catalog'))); if (cached.length) catalog = cached; } catch (error) {}
+  var state = { theme: 'auto', wallpaper: 'valley', apps: defaults.slice(), lastFocus: 'computer' };
   try {
-    var cachedApps = JSON.parse(localStorage.getItem('tvhome.catalog'));
-    if (Array.isArray(cachedApps)) window.TV_APPS.apps = cachedApps;
-  } catch (e) {}
-
-  var items = [];               // {app, el, color}
-  var zone = 'grid';            // 'grid' | 'top' | 'inputs'
-  var focused = 0, pillFocus = 0, inputFocus = 0, inputRows = [];
-  var offset = 0, heroShown = false, glassShown = false;
-  var editing = null;           // {item, snapshot} while a tile is being moved
-
-  // ---- luna bus ------------------------------------------------------------------------------
-
-  var bridges = [];   // keep a reference: a collected bridge drops its callback
-
-  function luna(uri, params, cb) {
-    try {
-      var b = new PalmServiceBridge();
-      b.onservicecallback = function (msg) {
-        var res;
-        try { res = JSON.parse(msg); } catch (e) { res = { returnValue: false }; }
-        if (cb) cb(res);
-        if (!params || !params.subscribe) bridges.splice(bridges.indexOf(b), 1);
-      };
-      bridges.push(b);
-      b.call(uri, JSON.stringify(params || {}));
-    } catch (e) {
-      if (cb) cb({ returnValue: false, errorText: String(e) });   // not on a TV (desktop preview)
-    }
-  }
-
-  function launch(id, title, params) {
-    luna('luna://com.webos.applicationManager/launch', { id: id, params: params || {} }, function (res) {
-      if (res.returnValue === false) toast('无法打开 ' + (title || id));
-    });
-  }
-
-  var toastTimer;
-  function toast(text) {
-    var t = $('toast');
-    t.textContent = text;
-    t.classList.add('shown');
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('shown'); }, 2200);
-  }
-
-  // ---- apps ----------------------------------------------------------------------------------
-
-  function orderedApps() {
-    var all = (window.TV_APPS && TV_APPS.apps) || [];
-    var byId = {};
-    all.forEach(function (a) { byId[a.id] = a; });
-    var hidden = {};
-    hiddenApps.forEach(function (id) { hidden[id] = true; });
-    var byTitle = function (a, b) { return a.title.toLowerCase() < b.title.toLowerCase() ? -1 : 1; };
-
-    // An order arranged on the TV wins, until dockApps in config.js changes.
-    var saved = loadOrder();
-    if (saved) {
-      var placed = [];
-      saved.forEach(function (id) {
-        if (byId[id] && !hidden[id]) { placed.push(byId[id]); hidden[id] = true; }
-      });
-      return placed.concat(all.filter(function (a) { return !hidden[a.id]; }).sort(byTitle));
-    }
-
-    var dock = [];
-    (CONFIG.dockApps || []).forEach(function (id) {
-      if (byId[id] && !hidden[id] && dock.length < COLUMNS) { dock.push(byId[id]); hidden[id] = true; }
-    });
-    var rest = all.filter(function (a) { return !hidden[a.id]; });
-    rest.sort(byTitle);
-    return dock.concat(rest);
-  }
-
-  var ORDER_KEY = 'tvhome.order';
-
-  function loadOrder() {
-    try {
-      var s = JSON.parse(localStorage.getItem(ORDER_KEY));
-      return s && s.dock === (CONFIG.dockApps || []).join(',') ? s.ids : null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  function saveOrder() {
-    try {
-      localStorage.setItem(ORDER_KEY, JSON.stringify({
-        dock: (CONFIG.dockApps || []).join(','),
-        ids: items.map(function (it) { return it.app.id; })
-      }));
-    } catch (e) { /* storage unavailable: the order lasts until the app restarts */ }
-  }
-
-  function rowOf(i) { return Math.floor(i / COLUMNS); }
-  function tileLeft(i) { return 112 + (i % COLUMNS) * CELL_W + (CELL_W - TILE_W) / 2; }
-  function tileTop(i) { var r = rowOf(i); return DOCK_TOP + r * ROW_PITCH + (r > 0 ? DOCK_GAP : 0); }
-
-  function build() {
-    tilesEl.innerHTML = '';
-    items = orderedApps().map(function (app) {
-      var el = document.createElement('div');
-      el.className = 'item';
-      var card = document.createElement('div');
-      card.className = 'card';
-      var img = document.createElement('img');
-      var item = { app: app, el: el, card: card, color: null };
-      img.onload = function () { paintTile(item, img); };
-      img.src = app.icon;
-      card.appendChild(img);
-      el.appendChild(card);
-      var name = document.createElement('div');
-      name.className = 'name';
-      name.textContent = app.title;
-      el.appendChild(name);
-      el.addEventListener('mouseover', function () {
-        if (zone !== 'inputs' && zone !== 'apps' && !editing) focusTile(items.indexOf(item));
-      });
-      el.addEventListener('click', function () {
-        if (zone === 'apps') return;
-        if (editing) finishEdit(true);
-        else launch(app.id, app.title);
-      });
-      tilesEl.appendChild(el);
-      return item;
-    });
-    document.body.classList.toggle('emptyApps', items.length === 0);
-    if (!items.length) { hideHero(); offset = 0; stage.style.transform = 'none'; }
-    layout();
-  }
-
-  /** Places every tile by its position in items; tiles glide when the order changes. */
-  function layout() {
-    items.forEach(function (it, i) {
-      it.el.style.left = tileLeft(i) + 'px';
-      it.el.style.top = tileTop(i) + 'px';
-      it.el.classList.toggle('dock', rowOf(i) === 0);   // the dock has no labels: the top shelf names it
-    });
-
-    var band = $('dockBand');
-    var n = Math.min(COLUMNS, items.length);
-    band.style.display = n ? 'block' : 'none';
-    band.style.left = (tileLeft(0) - 28) + 'px';
-    band.style.top = (DOCK_TOP - 28) + 'px';
-    band.style.width = ((n - 1) * CELL_W + TILE_W + 56) + 'px';
-    band.style.height = (TILE_H + 56) + 'px';
-  }
-
-  function animateIn() {
-    items.forEach(function (it, i) {
-      it.el.classList.remove('shown');
-      setTimeout(function () { it.el.classList.add('shown'); }, 60 + Math.min(i, 16) * 40);
-    });
-  }
-
-  /**
-   * Store icons are square logos on a solid colour: fill the wide tile with that colour so the logo
-   * reads as a banner. LG's system icons are glyphs on transparent: use the app's own colour.
-   */
-  function paintTile(item, img) {
-    var px = null, edge = null;
-    try {
-      var c = document.createElement('canvas');
-      c.width = 12; c.height = 12;
-      var g = c.getContext('2d');
-      g.drawImage(img, 0, 0, 12, 12);
-      px = g.getImageData(0, 0, 12, 12).data;
-      edge = edgeColor(img);
-    } catch (e) { /* tainted canvas: fall back to the app's colour */ }
-
-    var glyphColor = null;
-    if (edge && edge[3] > 200) {
-      item.card.style.background = 'rgb(' + edge[0] + ',' + edge[1] + ',' + edge[2] + ')';
+    var saved = JSON.parse(localStorage.getItem(KEY));
+    if (saved && ['auto', 'light', 'dark'].indexOf(saved.theme) >= 0 && ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) >= 0 && Array.isArray(saved.apps)) {
+      state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: saved.apps.filter(function (id, i, all) { return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i; }).slice(0, 6), lastFocus: saved.lastFocus || 'computer' };
     } else {
-      item.card.classList.add('glyph');
-      item.card.style.background = glyphBackground(item.app.iconColor);
-      glyphColor = glyphBackground(item.app.iconColor) === '#2c2c2e' ? null : parseColor(item.app.iconColor);
+      var hidden = JSON.parse(localStorage.getItem('tvhome.hidden'));
+      if (!Array.isArray(hidden)) hidden = CONFIG.hiddenApps || [];
+      var legacy = JSON.parse(localStorage.getItem('tvhome.order'));
+      if (legacy && Array.isArray(legacy.ids)) state.apps = legacy.ids.filter(function (id) { return hidden.indexOf(id) < 0; }).slice(0, 6);
+      else state.apps = defaults.filter(function (id) { return hidden.indexOf(id) < 0; });
     }
-    // A white glyph says nothing about the app: glow in the tile's colour instead.
-    item.color = glyphColor || (px ? vividColor(px) : parseColor(item.app.iconColor));
-    if (items[focused] === item) setAmbient(item.color);
+  } catch (error) {}
+  var dialogType = '', returnKey = 'computer', loadingApps = false, lastLaunch = 0, toastTimer, idleTimer;
+  var okDown = false, okTarget = null, okTimer = null, orderDraft = null, movingId = null;
+  var vpnRequest = 0;
+  document.body.classList.toggle('on-tv', TVDevice.available);
+  function icon(file) { var img = document.createElement('img'); img.src = 'assets/' + file; img.alt = ''; return img; }
+  function toast(text) { $('toast').textContent = text; $('toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { $('toast').classList.remove('visible'); }, 2400); }
+  function commit(changes) {
+    var next = { theme: state.theme, wallpaper: state.wallpaper, apps: state.apps.slice(), lastFocus: state.lastFocus };
+    Object.keys(changes).forEach(function (key) { next[key] = changes[key]; });
+    try { localStorage.setItem(KEY, JSON.stringify(next)); }
+    catch (error) { toast('保存失败，已保留原来的设置'); return false; }
+    state = next;
+    return true;
   }
-
-  /**
-   * The icon's background at full size: a corner pixel, or the middle of the left edge for rounded
-   * icons whose corners are transparent. A downscaled sample would blend in the logo.
-   */
-  function edgeColor(img) {
-    var w = img.naturalWidth, h = img.naturalHeight;
-    var c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    var g = c.getContext('2d');
-    g.drawImage(img, 0, 0);
-    var corner = g.getImageData(2, 2, 1, 1).data;
-    return corner[3] > 200 ? corner : g.getImageData(2, Math.floor(h / 2), 1, 1).data;
+  function installed(id) { return catalog.filter(function (app) { return app.id === id; })[0]; }
+  function appInfo(id) {
+    var app = installed(id), brand = brands[id] || {};
+    return { id: id, name: brand.name || (app && app.title) || id, subtitle: id === 'youtube.leanback.v4' && app && /adfree/i.test(app.title) ? 'AdFree' : brand.subtitle || '', icon: brand.icon, installedIcon: app && app.icon, style: brand.style || 'generic' };
   }
-
-  function glyphBackground(hex) {
-    var c = parseColor(hex);
-    if (!c) return '#2c2c2e';
-    var hsv = rgbToHsv(c);
-    if (hsv[1] < 0.15 && (hsv[2] > 0.85 || hsv[2] < 0.1)) return '#2c2c2e';   // white or black glyph colour
-    return 'rgb(' + c.join(',') + ')';
+  function fit() {
+    var reserve = TVDevice.available ? 0 : 30;
+    var scale = Math.min(window.innerWidth / 1920, (window.innerHeight - reserve) / 1080);
+    scene.style.transform = 'scale(' + scale + ')';
+    scene.style.left = ((window.innerWidth - 1920 * scale) / 2) + 'px';
+    scene.style.top = ((window.innerHeight - reserve - 1080 * scale) / 2) + 'px';
   }
-
-  /** A vivid colour from the icon: the most saturated, not too dark pixel, or the lifted average. */
-  function vividColor(px) {
-    var best = null, bestScore = -1, sum = [0, 0, 0], n = 0;
-    for (var i = 0; i < px.length; i += 4) {
-      if (px[i + 3] < 128) continue;
-      var p = [px[i], px[i + 1], px[i + 2]];
-      sum[0] += p[0]; sum[1] += p[1]; sum[2] += p[2]; n++;
-      var hsv = rgbToHsv(p);
-      var score = hsv[1] * Math.min(1, hsv[2] * 1.4);
-      if (score > bestScore) { bestScore = score; best = p; }
-    }
-    if (!n) return [68, 68, 68];
-    if (bestScore < 0.25) {   // nearly monochrome icon (e.g. white): its average, lifted
-      var avg = rgbToHsv([sum[0] / n, sum[1] / n, sum[2] / n]);
-      avg[2] = Math.max(avg[2], 0.55);
-      return hsvToRgb(avg);
-    }
-    var h = rgbToHsv(best);
-    h[1] = Math.min(1, h[1] * 1.1);
-    h[2] = Math.max(0.5, h[2]);
-    return hsvToRgb(h);
+  function appearance() {
+    var effective = FrameTheme.resolve(state.theme, new Date().getHours());
+    scene.dataset.theme = effective; scene.dataset.wallpaper = state.wallpaper;
+    $('theme').firstElementChild.src = effective === 'dark' ? 'assets/sun.svg' : 'assets/moon.svg';
+    $('theme').setAttribute('aria-label', (effective === 'dark' ? '切换浅色主题' : '切换深色主题') + (state.theme === 'auto' ? '，当前按时间自动切换' : ''));
   }
-
-  function parseColor(hex) {
-    var m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
-    if (!m) return null;
-    var v = parseInt(m[1], 16);
-    return [v >> 16 & 255, v >> 8 & 255, v & 255];
-  }
-
-  function rgbToHsv(c) {
-    var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255;
-    var max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min, h = 0;
-    if (d) {
-      if (max === r) h = ((g - b) / d) % 6;
-      else if (max === g) h = (b - r) / d + 2;
-      else h = (r - g) / d + 4;
-      h *= 60;
-      if (h < 0) h += 360;
-    }
-    return [h, max ? d / max : 0, max];
-  }
-
-  function hsvToRgb(hsv) {
-    var h = hsv[0], s = hsv[1], v = hsv[2];
-    var c = v * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = v - c, rgb;
-    if (h < 60) rgb = [c, x, 0];
-    else if (h < 120) rgb = [x, c, 0];
-    else if (h < 180) rgb = [0, c, x];
-    else if (h < 240) rgb = [0, x, c];
-    else if (h < 300) rgb = [x, 0, c];
-    else rgb = [c, 0, x];
-    return rgb.map(function (k) { return Math.round((k + m) * 255); });
-  }
-
-  // ---- focus & glass -------------------------------------------------------------------------
-
-  function focusTile(i) {
-    if (!items.length) return;
-    i = Math.max(0, Math.min(i, items.length - 1));
-    setZone('grid');
-    if (items[focused]) items[focused].el.classList.remove('focused');
-    focused = i;
-    items[i].el.classList.add('focused');
-
-    var top = tileTop(i), row = rowOf(i);
-    if (row === 0) {
-      offset = 0;
-    } else {
-      // Scroll just enough so the whole glass and the name below the tile are visible.
-      if (top - offset + TILE_H + 70 > VIEW_BOTTOM) offset = top + TILE_H + 70 - VIEW_BOTTOM;
-      if (top - offset - 24 < VIEW_TOP) offset = top - 24 - VIEW_TOP;
-    }
-    stage.style.transform = 'translateY(' + (-offset) + 'px)';
-    // Keep the header until the content (the dock band is topmost) would run into it.
-    var header = document.querySelector('header');
-    var headerBottom = header.offsetTop + header.offsetHeight;   // layout box: ignores the hide slide
-    document.body.classList.toggle('scrolled', DOCK_TOP - 28 - offset < headerBottom + 24);
-
-    var w = TILE_W * FOCUS_SCALE + 2 * GLASS_PAD, h = TILE_H * FOCUS_SCALE + 2 * GLASS_PAD;
-    var x = tileLeft(i) + TILE_W / 2 - w / 2, y = top + TILE_H / 2 - h / 2;
-    glass.style.width = w + 'px';
-    glass.style.height = h + 'px';
-    glass.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-    if (!glassShown) {
-      // First show: jump there without the spring, then fade in.
-      glass.style.transition = 'none';
-      glass.offsetWidth;   // flush the jump before restoring the transition
-      glass.style.transition = '';
-      glass.style.opacity = '1';
-      glassShown = true;
-    }
-
-    if (row === 0) showHero(items[i]);
-    else hideHero();
-    setAmbient(items[i].color);   // the glow follows the focused tile in every row
-  }
-
-  function hideGlass() {
-    glassShown = false;
-    glass.style.opacity = '0';
-  }
-
-  function showHero(item) {
-    var label = item.app.title;
-    hero.style.top = (DOCK_TOP - 28 - 52 - 96) + 'px';
-    if (!heroShown) {
-      hero.textContent = label;
-      hero.style.transform = 'none';
-      hero.style.opacity = '1';
-      heroShown = true;
-    } else if (hero.textContent !== label) {
-      hero.style.opacity = '0';
-      hero.style.transform = 'translateX(-24px)';
-      clearTimeout(hero.swap);
-      hero.swap = setTimeout(function () {
-        hero.textContent = label;
-        hero.style.transition = 'none';
-        hero.style.transform = 'translateX(24px)';
-        hero.offsetWidth;
-        hero.style.transition = '';
-        hero.style.transform = 'none';
-        hero.style.opacity = '1';
-      }, 120);
-    }
-    setAmbient(item.color);
-  }
-
-  function hideHero() {
-    if (!heroShown) return;
-    heroShown = false;
-    hero.style.opacity = '0';
-  }
-
-  /** Crossfades the glow to a new colour by swapping between two layers. */
-  function setAmbient(color) {
-    if (!color) return;
-    var key = color.join(',');
-    if (key === ambientColor) return;
-    ambientColor = key;
-    var back = ambients[1 - ambientFront];
-    back.style.background = 'radial-gradient(circle 1190px at 32% 42%, rgba(' + key + ',0.36) 0%, rgba(' +
-      key + ',0.15) 50%, rgba(' + key + ',0) 100%)';
-    back.style.opacity = '1';
-    ambients[ambientFront].style.opacity = '0';
-    ambientFront = 1 - ambientFront;
-  }
-
-  function focusPill(i) {
-    setZone('top');
-    document.body.classList.remove('scrolled');
-    pills[pillFocus].classList.remove('focused');
-    pillFocus = Math.max(0, Math.min(i, pills.length - 1));
-    pills[pillFocus].classList.add('focused');
-  }
-
-  function setZone(z) {
-    if (zone === z) return;
-    if (zone === 'top') pills[pillFocus].classList.remove('focused');
-    if (zone === 'grid') {
-      if (items[focused]) items[focused].el.classList.remove('focused');
-      hideGlass();
-    }
-    zone = z;
-  }
-
-  /** The pill straight above a dock tile, by horizontal distance. */
-  function pillAbove(i) {
-    var cx = tileLeft(i) + TILE_W / 2, best = 0, bestD = Infinity;
-    pills.forEach(function (p, k) {
-      var r = p.getBoundingClientRect();
-      var d = Math.abs(r.left + r.width / 2 - cx);
-      if (d < bestD) { bestD = d; best = k; }
-    });
-    return best;
-  }
-
-  // ---- top bar -------------------------------------------------------------------------------
-
-  function updateClock() {
+  function clock() {
     var now = new Date(), h = now.getHours();
-    for (var k = 0; k < GREETINGS.length; k++) {
-      if (h < GREETINGS[k][0]) { $('greeting').textContent = GREETINGS[k][1]; break; }
-    }
-    var m = now.getMinutes();
-    $('clock').textContent = h + ':' + (m < 10 ? '0' : '') + m;
-    $('ampm').textContent = '';
-    $('date').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日  ' + DAYS[now.getDay()];
+    $('clock').textContent = ('0' + h).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    $('date').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日，星期' + '日一二三四五六'.charAt(now.getDay());
+    $('greeting').textContent = h < 5 ? '夜深了' : h < 12 ? '早上好' : h < 18 ? '下午好' : '晚上好';
+    appearance();
   }
-
-  /** Shows the Wi-Fi network name when the TV reports it, otherwise the connection type. */
-  function watchNetwork() {
-    luna('luna://com.palm.connectionmanager/getStatus', { subscribe: true }, function (res) {
-      if (res.returnValue === false && !res.wifi && !res.wired) return;
-      var text = 'Wi-Fi';
-      if (res.wired && res.wired.state === 'connected') text = 'Ethernet';
-      else if (res.wifi && res.wifi.state === 'connected') text = res.wifi.ssid || 'Wi-Fi';
-      else if (res.isInternetConnectionAvailable === false) text = 'Offline';
-      $('wifiLabel').textContent = text;
+  function resetIdle() {
+    scene.dataset.idle = 'false'; clearTimeout(idleTimer);
+    idleTimer = setTimeout(function () { scene.dataset.idle = 'true'; }, 180000);
+  }
+  function focusables() {
+    return Array.prototype.slice.call((overlay.hidden ? scene : overlay).querySelectorAll('button:not([disabled])')).filter(function (el) { return el.getClientRects().length && (overlay.hidden ? !overlay.contains(el) : true); });
+  }
+  function focusKey(key) {
+    var target = focusables().filter(function (el) { return el.dataset.key === key; })[0] || (overlay.hidden ? $('computer') : body.querySelector('button')) || $('close');
+    target.focus({ preventScroll: true });
+  }
+  function keepPanelFocusVisible(target) {
+    if (overlay.hidden || !panel.contains(target)) return;
+    var a = target.getBoundingClientRect(), b = panel.getBoundingClientRect(), scale = b.width / panel.offsetWidth;
+    if (a.top < b.top + 20 * scale) panel.scrollTop += (a.top - b.top) / scale - 20;
+    else if (a.bottom > b.bottom - 20 * scale) panel.scrollTop += (a.bottom - b.bottom) / scale + 20;
+  }
+  function renderApps() {
+    var ids = state.apps.filter(function (id) { return !!installed(id); });
+    var widths = { 1: [7], 2: [7, 7], 3: [4, 3, 7], 4: [4, 3, 3, 4], 5: [4, 3, 2, 2, 3], 6: [3, 2, 2, 3, 2, 2] };
+    $('apps').innerHTML = '';
+    ids.forEach(function (id, index) {
+      var app = appInfo(id), button = document.createElement('button');
+      button.className = 'tile app-tile app-' + app.style; button.dataset.key = id;
+      button.setAttribute('aria-label', '打开 ' + app.name);
+      button.style.gridColumn = 'span ' + widths[ids.length][index];
+      if (ids.length === 1) button.style.gridRow = 'span 2';
+      if (app.icon || app.installedIcon) {
+        var image = app.icon ? icon(app.icon) : document.createElement('img');
+        image.className = 'brand' + (app.icon ? '' : ' installed-icon'); image.alt = '';
+        if (!app.icon) image.src = app.installedIcon;
+        button.appendChild(image);
+      } else { var mark = document.createElement('span'); mark.className = app.style === 'prime' ? 'prime-wordmark' : 'generic-mark'; mark.textContent = app.style === 'prime' ? 'prime video' : app.name.charAt(0); button.appendChild(mark); }
+      var arrow = icon('arrow-up-right.svg'); arrow.className = 'tile-arrow'; button.appendChild(arrow);
+      var copy = document.createElement('span'); copy.className = 'app-copy';
+      var title = document.createElement('strong'); title.textContent = app.name; copy.appendChild(title);
+      if (app.subtitle && ids.length < 6) { var small = document.createElement('small'); small.textContent = app.subtitle; copy.appendChild(small); }
+      button.appendChild(copy); button.onclick = function () { launch(id); }; $('apps').appendChild(button);
     });
-  }
-
-  function activatePill(i) {
-    if (i === 0) showApps();
-    else if (i === 1) showInputs();
-    else if (i === 2) launch('com.palm.app.settings', 'Settings', { target: 'network' });
-    else launch('com.palm.app.settings', 'Settings');
-  }
-
-  function rebuildApps() {
-    var id = items[focused] && items[focused].app.id;
-    hideGlass();
-    build();
-    focused = Math.max(0, items.map(function (it) { return it.app.id; }).indexOf(id));
-    animateIn();
-    if (zone !== 'apps') {
-      if (items.length) focusTile(focused);
-      else focusPill(0);
+    if (!ids.length) {
+      var empty = document.createElement('button'); empty.className = 'tile app-tile empty-add'; empty.dataset.key = 'add'; empty.appendChild(icon('plus.svg'));
+      var label = document.createElement('strong'); label.textContent = '添加常用应用'; empty.appendChild(label); empty.onclick = function () { openDialog('manage'); }; $('apps').appendChild(empty);
     }
+    $('all').querySelector('small').textContent = catalog.length + ' 个应用';
   }
-
   function refreshApps(notify) {
-    if (refreshingApps) return;
-    refreshingApps = true;
-    luna('luna://com.gathin.tvhome.service/listApps', {}, function (res) {
-      refreshingApps = false;
-      if (res.returnValue !== true || !Array.isArray(res.apps) || !res.apps.length) {
-        if (notify) toast('刷新失败，保留原有列表');
-        return;
+    if (!TVDevice.available) { if (notify) toast('浏览器使用本地应用快照，请在电视上刷新'); return; }
+    if (loadingApps) return;
+    loadingApps = true;
+    TVDevice.listApps(function (result) {
+      loadingApps = false;
+      var next = result.returnValue && sanitizeApps(result.apps);
+      if (!next || !next.length) { if (notify) toast('刷新失败，保留原有列表'); return; }
+      var key = document.activeElement && document.activeElement.dataset.key;
+      var changed = JSON.stringify(next) !== JSON.stringify(catalog);
+      catalog = next;
+      try { localStorage.setItem('tvhome.catalog', JSON.stringify(catalog)); } catch (error) {}
+      if (changed && !document.hidden) {
+        renderApps();
+        if (dialogType === 'all' || dialogType === 'manage') openDialog(dialogType, key);
+        else if (overlay.hidden) focusKey(key || state.lastFocus);
       }
-      var changed = JSON.stringify(TV_APPS.apps) !== JSON.stringify(res.apps);
-      TV_APPS.apps = res.apps;
-      try { localStorage.setItem('tvhome.catalog', JSON.stringify(res.apps)); } catch (e) {}
-      if (changed && !document.hidden) rebuildApps();
-      if (zone === 'apps') renderManagedApps();
+      refreshVpn();
       if (notify) toast('已刷新应用列表');
     });
   }
-
-  function showApps() {
-    panel.classList.add('hidden');
-    setZone('apps');
-    appsPanel.classList.remove('hidden');
-    managedFocus = 0;
-    renderManagedApps();
+  function refreshVpn() {
+    if (document.hidden) return;
+    if (!installed(vpnId)) { $('vpnLabel').textContent = '打开网络设置'; return; }
+    if (!TVDevice.available) { $('vpnLabel').textContent = 'Alcyone VPN'; return; }
+    var request = ++vpnRequest;
+    TVDevice.vpnStatus(function (result) {
+      if (request !== vpnRequest || document.hidden) return;
+      $('vpnLabel').textContent = !result.returnValue ? 'VPN 状态暂不可用' : result.connected ? 'VPN 已连接' : 'VPN 未连接';
+    });
   }
-
-  function renderManagedApps() {
-    appsRows.innerHTML = '';
-    managedRows = [];
-    function row(title, state, action) {
-      var el = document.createElement('div'), name = document.createElement('span'), status = document.createElement('span');
-      el.className = 'appManageRow';
-      name.className = 'appTitle'; name.textContent = title;
-      status.className = 'appState'; status.textContent = state;
-      el.appendChild(name); el.appendChild(status); appsRows.appendChild(el);
-      var index = managedRows.length;
-      el.addEventListener('mouseover', function () { focusManaged(index); });
-      el.addEventListener('click', action);
-      managedRows.push({ el: el, action: action });
-    }
-    row('刷新已安装应用', '', function () { refreshApps(true); });
-    TV_APPS.apps.forEach(function (app) {
-      row(app.title, hiddenApps.indexOf(app.id) < 0 ? '已显示' : '已隐藏', function () {
-        var index = hiddenApps.indexOf(app.id), next = hiddenApps.slice();
-        if (index < 0) next.push(app.id); else next.splice(index, 1);
-        try { localStorage.setItem('tvhome.hidden', JSON.stringify(next)); }
-        catch (e) { toast('保存失败，请稍后重试'); return; }
-        hiddenApps = next;
-        rebuildApps();
-        renderManagedApps();
+  function launch(id, params) {
+    if (Date.now() - lastLaunch < 800) return;
+    lastLaunch = Date.now();
+    var key = document.activeElement && document.activeElement.dataset.key;
+    TVDevice.launch(id, params, function (result) {
+      if (!result.returnValue) { toast(result.errorText || '无法打开此应用'); return; }
+      if (key && overlay.hidden) commit({ lastFocus: key });
+    });
+  }
+  function closeDialog() { overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; focusKey(returnKey); }
+  function openDialog(type, key) {
+    if (overlay.hidden) returnKey = document.activeElement && document.activeElement.dataset.key || 'computer';
+    overlay.hidden = false; dialogType = type; body.innerHTML = ''; panel.scrollTop = 0;
+    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '让桌面更像你', inputs: '选择输入源' }[type];
+    $('dialog-kicker').textContent = '我的空间';
+    $('overlay').querySelector('.dialog-foot').textContent = '方向键选择 · 确认键操作 · 返回键关闭';
+    if (type === 'all' || type === 'manage') renderCatalog(type === 'manage');
+    if (type === 'settings') renderSettings();
+    if (type === 'inputs') renderInputs();
+    if (type === 'order') renderOrder();
+    focusKey(key || (body.querySelector('button') && body.querySelector('button').dataset.key));
+  }
+  function paragraph(text) { var p = document.createElement('p'); p.className = 'panel-description'; p.textContent = text; body.appendChild(p); }
+  function button(text, className, key, action) {
+    var item = document.createElement('button'); item.className = className; item.textContent = text; if (key) item.dataset.key = key; item.onclick = action; return item;
+  }
+  function renderCatalog(manage) {
+    paragraph(manage ? '选择放在首页的应用，最多六个。隐藏图标不会卸载应用。' : '选择应用打开；安装新应用后可以刷新列表。');
+    var bar = document.createElement('div'); bar.className = 'choice-group'; bar.style.marginBottom = '24px'; body.appendChild(bar);
+    if (manage) bar.appendChild(button('调整首页顺序', 'choice', 'reorder', function () { orderDraft = null; movingId = null; openDialog('order'); }));
+    else bar.appendChild(button('编辑桌面', 'choice', 'manage', function () { openDialog('manage'); }));
+    bar.appendChild(button('刷新应用', 'choice', 'refresh', function () { refreshApps(true); }));
+    var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
+    var rows = catalog.slice();
+    if (manage) state.apps.forEach(function (id) { if (!installed(id)) rows.push({ id: id, title: appInfo(id).name + '（暂不可用）' }); });
+    rows.forEach(function (raw) {
+      var app = appInfo(raw.id), selected = state.apps.indexOf(app.id) >= 0;
+      var row = document.createElement('button'); row.className = 'list-item'; row.dataset.key = 'list-' + app.id;
+      var mark = document.createElement('span'); mark.className = 'mark';
+      if (app.icon || app.installedIcon) { var image = app.icon ? icon(app.icon) : document.createElement('img'); if (!app.icon) { image.src = app.installedIcon; image.alt = ''; image.style.filter = 'none'; } mark.appendChild(image); }
+      else mark.textContent = app.name.charAt(0);
+      row.appendChild(mark);
+      var name = document.createElement('span'); name.textContent = raw.title; row.appendChild(name);
+      if (manage) {
+        row.setAttribute('aria-pressed', String(selected));
+        var box = document.createElement('span'); box.className = 'checkbox' + (selected ? ' selected' : ''); if (selected) box.appendChild(icon('check.svg')); row.appendChild(box);
+      } else if (selected) { var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '在首页'; row.appendChild(tag); }
+      row.onclick = function () {
+        if (!manage) return launch(app.id);
+        var ids = state.apps.slice(), index = ids.indexOf(app.id);
+        if (index < 0 && ids.length === 6) return toast('首页最多放六个应用，请先移除一个');
+        if (index < 0) ids.push(app.id); else ids.splice(index, 1);
+        if (!commit({ apps: ids })) return;
+        renderApps(); openDialog('manage', row.dataset.key);
+      };
+      list.appendChild(row);
+    });
+  }
+  function renderOrder() {
+    paragraph(movingId ? '正在移动：' + appInfo(movingId).name + '。上下调整位置，确认保存，返回取消。' : '选中应用按确认开始移动，再按确认保存。');
+    var list = document.createElement('div'); list.className = 'order-list'; body.appendChild(list);
+    (orderDraft || state.apps).forEach(function (id, index) {
+      var row = button('', 'list-item order-item' + (movingId === id ? ' moving' : ''), 'order-' + id, function () {
+        if (movingId) {
+          if (commit({ apps: orderDraft.slice() })) { orderDraft = null; movingId = null; renderApps(); openDialog('order', 'order-' + id); }
+        } else { orderDraft = state.apps.slice(); movingId = id; openDialog('order', 'order-' + id); }
       });
+      var number = document.createElement('span'); number.className = 'order-number'; number.textContent = ('0' + (index + 1)).slice(-2); row.appendChild(number);
+      var label = document.createElement('span'); label.className = 'order-label'; label.textContent = appInfo(id).name; row.appendChild(label); row.appendChild(icon('grip-vertical.svg')); list.appendChild(row);
     });
-    focusManaged(managedFocus);
+    if (!state.apps.length) paragraph('先在“编辑桌面”中添加应用。');
   }
-
-  function focusManaged(index) {
-    if (managedRows[managedFocus]) managedRows[managedFocus].el.classList.remove('focused');
-    managedFocus = Math.max(0, Math.min(index, managedRows.length - 1));
-    var el = managedRows[managedFocus].el;
-    el.classList.add('focused');
-    var top = el.offsetTop - appsRows.offsetTop;
-    if (top < appsRows.scrollTop) appsRows.scrollTop = top;
-    else if (top + el.offsetHeight > appsRows.scrollTop + appsRows.clientHeight) appsRows.scrollTop = top + el.offsetHeight - appsRows.clientHeight;
+  function moveOrder(delta) {
+    var from = orderDraft.indexOf(movingId), to = Math.max(0, Math.min(orderDraft.length - 1, from + delta));
+    if (from === to) return;
+    orderDraft.splice(to, 0, orderDraft.splice(from, 1)[0]); openDialog('order', 'order-' + movingId);
   }
-
-  function hideApps() {
-    appsPanel.classList.add('hidden');
-    focusPill(0);
-  }
-
-  // ---- inputs dropdown -----------------------------------------------------------------------
-
-  function showInputs() {
-    panel.innerHTML = '';
-    inputRows = [];
-    var inputs = (window.TV_APPS && TV_APPS.inputs) || [];
-    inputs.forEach(function (inp) { addInputRow(ICON_INPUT, inp.label, inp.appId); });
-    if (CONFIG.liveTvApp) {
-      if (inputRows.length) panel.appendChild(Object.assign(document.createElement('div'), { className: 'separator' }));
-      addInputRow(ICON_LIVETV, '电视直播', CONFIG.liveTvApp);
+  function renderSettings() {
+    paragraph('壁纸只用于桌面，不改变电视的图像设置。');
+    function choices(title, key, values) {
+      var row = document.createElement('div'); row.className = 'settings-row'; var label = document.createElement('span'); label.textContent = title; row.appendChild(label);
+      var group = document.createElement('div'); group.className = 'choice-group'; row.appendChild(group);
+      values.forEach(function (option) {
+        var item = button(option[1], 'choice' + (state[key] === option[0] ? ' selected' : ''), key + '-' + option[0], function () {
+          var changes = {}; changes[key] = option[0]; if (!commit(changes)) return; appearance(); openDialog('settings', item.dataset.key);
+        }); item.setAttribute('aria-pressed', String(state[key] === option[0])); group.appendChild(item);
+      }); body.appendChild(row);
     }
-    if (!inputRows.length) { toast('未找到输入源'); return; }
-
-    // Hang right below the Inputs pill, at least as wide as it.
-    var r = pills[0].getBoundingClientRect();
-    panel.style.left = r.left + 'px';
-    panel.style.top = (r.bottom + 20) + 'px';
-    panel.style.minWidth = Math.max(r.width, 300) + 'px';
-    panel.classList.remove('hidden');
-    pills[pillFocus].classList.remove('focused');
-    zone = 'inputs';
-    focusInput(0);
+    choices('主题', 'theme', [['auto', '自动'], ['dark', '深色'], ['light', '浅色']]);
+    paragraph('自动模式按电视本地时间：07:00–19:00 浅色，其他时间深色。手动选择后保持固定。');
+    choices('背景', 'wallpaper', [['valley', '山谷'], ['peaks', '雾峰'], ['plain', '纯色']]);
+    body.appendChild(button('编辑首页应用', 'list-item', 'edit-home', function () { openDialog('manage'); }));
+    var system = button('LG 系统设置', 'list-item', 'system-settings', function () { launch('com.palm.app.settings'); }); system.style.marginTop = '12px'; body.appendChild(system);
   }
-
-  function addInputRow(icon, label, appId) {
-    var row = document.createElement('div');
-    row.className = 'inputRow';
-    row.innerHTML = '<svg viewBox="0 0 24 24"><path d="' + icon + '"/></svg>';
-    row.appendChild(document.createTextNode(label));
-    var idx = inputRows.length;
-    row.addEventListener('mouseover', function () { focusInput(idx); });
-    row.addEventListener('click', function () { hideInputs(); launch(appId, label); });
-    row.appId = appId;
-    row.label = label;
-    inputRows.push(row);
-    panel.appendChild(row);
-  }
-
-  function focusInput(i) {
-    if (inputRows[inputFocus]) inputRows[inputFocus].classList.remove('focused');
-    inputFocus = Math.max(0, Math.min(i, inputRows.length - 1));
-    inputRows[inputFocus].classList.add('focused');
-  }
-
-  function hideInputs() {
-    panel.classList.add('hidden');
-    zone = 'none';
-    focusPill(1);
-  }
-
-  // ---- rearranging ---------------------------------------------------------------------------
-
-  /** Hold OK on a tile: it wiggles, the arrows move it, OK places it, Back puts everything back. */
-  function startEdit() {
-    var it = items[focused];
-    if (!it) return;
-    editing = { item: it, snapshot: items.slice() };
-    it.el.classList.add('moving');
-    document.body.classList.add('editing');
-    toast('方向键移动 · 确认键放置 · 返回键取消');
-  }
-
-  function moveTo(to) {
-    if (to < 0 || to >= items.length || to === focused) return;
-    items.splice(to, 0, items.splice(focused, 1)[0]);
-    focused = to;
-    layout();
-    focusTile(to);
-  }
-
-  function finishEdit(keep) {
-    var it = editing.item;
-    if (!keep) {
-      items = editing.snapshot;
-      layout();
-    }
-    editing = null;
-    it.el.classList.remove('moving');
-    document.body.classList.remove('editing');
-    if (keep) saveOrder();
-    focused = items.indexOf(it);
-    focusTile(focused);
-  }
-
-  // ---- keys ----------------------------------------------------------------------------------
-
-  var LONG_PRESS_MS = 600;
-  var okDown = false, okTimer = null;
-
-  // On tiles OK acts on release, so a held OK can start rearranging instead of opening the app.
-  document.addEventListener('keyup', function (e) {
-    if (e.keyCode !== KEY.OK) return;
-    okDown = false;
-    if (!okTimer) return;
-    clearTimeout(okTimer);
-    okTimer = null;
-    var it = items[focused];
-    if (zone === 'grid' && it && !editing) launch(it.app.id, it.app.title);
-  });
-
-  document.addEventListener('keydown', function (e) {
-    var k = e.keyCode;
-    if (k === KEY.OK && okDown) { e.preventDefault(); return; }   // key repeat while held
-    if (k === KEY.OK) okDown = true;
-    if (zone === 'apps') {
-      if (k === KEY.UP) focusManaged(managedFocus - 1);
-      else if (k === KEY.DOWN) focusManaged(managedFocus + 1);
-      else if (k === KEY.OK) managedRows[managedFocus].action();
-      else if (k === KEY.BACK || k === KEY.ESC) hideApps();
-      else return;
-    } else if (editing) {
-      if (k === KEY.LEFT) moveTo(focused - 1);
-      else if (k === KEY.RIGHT) moveTo(focused + 1);
-      else if (k === KEY.UP) moveTo(focused - COLUMNS);
-      else if (k === KEY.DOWN) moveTo(Math.min(focused + COLUMNS, items.length - 1));
-      else if (k === KEY.OK) finishEdit(true);
-      else if (k === KEY.BACK || k === KEY.ESC) finishEdit(false);
-      else return;
-    } else if (zone === 'inputs') {
-      if (k === KEY.UP) focusInput(inputFocus - 1);
-      else if (k === KEY.DOWN) focusInput(inputFocus + 1);
-      else if (k === KEY.OK) { var row = inputRows[inputFocus]; hideInputs(); launch(row.appId, row.label); }
-      else if (k === KEY.BACK || k === KEY.ESC || k === KEY.LEFT || k === KEY.RIGHT) hideInputs();
-      else return;
-    } else if (zone === 'top') {
-      if (k === KEY.LEFT) focusPill(pillFocus - 1);
-      else if (k === KEY.RIGHT) focusPill(pillFocus + 1);
-      else if (k === KEY.DOWN && items.length) focusTile(rowOf(focused) === 0 ? focused : 0);
-      else if (k === KEY.OK) activatePill(pillFocus);
-      else if (k === KEY.BACK) { /* home screen: Back goes nowhere */ }
-      else return;
-    } else {
-      var col = focused % COLUMNS, last = items.length - 1;
-      if (k === KEY.LEFT) { if (col > 0) focusTile(focused - 1); }
-      else if (k === KEY.RIGHT) { if (col < COLUMNS - 1 && focused < last) focusTile(focused + 1); }
-      else if (k === KEY.UP) {
-        if (rowOf(focused) === 0) focusPill(pillAbove(focused));
-        else focusTile(focused - COLUMNS);
-      } else if (k === KEY.DOWN) {
-        if (rowOf(focused) < rowOf(last)) focusTile(Math.min(focused + COLUMNS, last));
-      } else if (k === KEY.OK) {
-        okTimer = setTimeout(function () { okTimer = null; startEdit(); }, LONG_PRESS_MS);
-      } else if (k === KEY.BACK) { /* home screen: Back goes nowhere */ }
-      else return;
-    }
-    e.preventDefault();
-  });
-
-  pills.forEach(function (p, i) {
-    p.addEventListener('mouseover', function () { if (zone !== 'inputs' && zone !== 'apps') focusPill(i); });
-    p.addEventListener('click', function () {
-      if (zone === 'apps') { hideApps(); if (i === 0) return; }
-      activatePill(i);
+  function renderInputs() {
+    var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
+    var inputs = window.TV_APPS && Array.isArray(TV_APPS.inputs) ? TV_APPS.inputs : [];
+    if (!inputs.length) inputs = [1, 2, 3, 4].map(function (n) { return { appId: 'com.webos.app.hdmi' + n, label: 'HDMI ' + n }; });
+    inputs.forEach(function (input) {
+      var row = button('', 'list-item', input.appId, function () { launch(input.appId); }); row.appendChild(icon('plug-connected.svg')); row.appendChild(document.createTextNode(input.label || input.appId)); list.appendChild(row);
     });
+    if (CONFIG.liveTvApp) list.appendChild(button('直播电视', 'list-item', 'live-tv', function () { launch(CONFIG.liveTvApp); }));
+  }
+  function moveFocus(key) {
+    var elements = focusables(), current = document.activeElement;
+    if (elements.indexOf(current) < 0) return focusKey('computer');
+    var a = current.getBoundingClientRect(), ax = (a.left + a.right) / 2, ay = (a.top + a.bottom) / 2, best, score = Infinity;
+    elements.forEach(function (el) {
+      if (el === current) return;
+      var b = el.getBoundingClientRect(), dx = (b.left + b.right) / 2 - ax, dy = (b.top + b.bottom) / 2 - ay;
+      var horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
+      var ahead = key === 'ArrowRight' ? dx : key === 'ArrowLeft' ? -dx : key === 'ArrowDown' ? dy : -dy;
+      if (ahead <= 2) return;
+      var overlap = horizontal ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      var gap = key === 'ArrowRight' ? b.left - a.right : key === 'ArrowLeft' ? a.left - b.right : key === 'ArrowDown' ? b.top - a.bottom : a.top - b.bottom;
+      var value = Math.max(0, gap) + Math.abs(horizontal ? dy : dx) * 1.4 + (overlap > 0 ? 0 : 500);
+      if (!best || value < score - 1) { score = value; best = el; }
+    });
+    if (best) { best.focus({ preventScroll: true }); keepPanelFocusVisible(best); }
+  }
+  function resetKeys() { okDown = false; okTarget = null; clearTimeout(okTimer); okTimer = null; }
+  document.addEventListener('keydown', function (event) {
+    resetIdle();
+    var key = event.key || { 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 461: 'Escape' }[event.keyCode] || '';
+    if (key.indexOf('Arrow') === 0) {
+      event.preventDefault();
+      if (dialogType === 'order' && movingId) { if (key === 'ArrowUp' || key === 'ArrowDown') moveOrder(key === 'ArrowUp' ? -1 : 1); }
+      else moveFocus(key);
+    } else if (key === 'Enter') {
+      event.preventDefault(); if (okDown) return; okDown = true; okTarget = document.activeElement;
+      if (overlay.hidden && okTarget && state.apps.indexOf(okTarget.dataset.key) >= 0) {
+        okTimer = setTimeout(function () { var id = okTarget && okTarget.dataset.key; okTarget = null; okTimer = null; if (id) { orderDraft = state.apps.slice(); movingId = id; openDialog('order', 'order-' + id); } }, 600);
+      }
+    } else if (key === 'Escape' || event.keyCode === 461 || event.keyCode === 27) {
+      event.preventDefault(); resetKeys();
+      if (dialogType === 'order' && movingId) { orderDraft = null; movingId = null; openDialog('order'); }
+      else if (!overlay.hidden) closeDialog();
+    } else if (key.toLowerCase() === 'm' && overlay.hidden) { event.preventDefault(); openDialog('manage'); }
+    else if (key === 'Tab' && !overlay.hidden) {
+      var choices = focusables(), index = choices.indexOf(document.activeElement); event.preventDefault(); choices[(index + (event.shiftKey ? -1 : 1) + choices.length) % choices.length].focus();
+    }
   });
-
-  // ---- lifecycle -----------------------------------------------------------------------------
-
-  /** Back from another app (or opened again from the shortcut): replay the entrance, keep the tile. */
+  document.addEventListener('keyup', function (event) {
+    if (event.key !== 'Enter' && event.keyCode !== 13) return;
+    event.preventDefault(); var target = okTarget; resetKeys();
+    if (target && target === document.activeElement && document.documentElement.contains(target)) target.click();
+  });
+  $('computer').onclick = function () { launch(computer); };
+  $('edit').onclick = function () { openDialog('manage'); };
+  $('all').onclick = function () { openDialog('all'); refreshApps(false); };
+  $('inputs').onclick = function () { openDialog('inputs'); };
+  $('network').onclick = function () { if (installed(vpnId)) launch(vpnId); else launch('com.palm.app.settings', { target: 'network' }); };
+  $('settings').onclick = $('appearance').onclick = function () { openDialog('settings'); };
+  $('theme').onclick = function () {
+    var wasAuto = state.theme === 'auto'; if (!commit({ theme: scene.dataset.theme === 'dark' ? 'light' : 'dark' })) return; appearance();
+    if (wasAuto) toast('已固定主题，可在设置中恢复自动');
+  };
+  $('close').onclick = closeDialog;
+  overlay.addEventListener('click', function (event) { if (event.target === overlay) closeDialog(); });
+  document.addEventListener('focusin', function (event) { keepPanelFocusVisible(event.target); });
+  ['mousedown', 'mousemove', 'wheel'].forEach(function (name) { document.addEventListener(name, resetIdle); });
   function resume() {
-    okDown = false;
-    clearTimeout(okTimer);
-    okTimer = null;
-    if (editing) finishEdit(false);
-    updateClock();
-    panel.classList.add('hidden');
-    appsPanel.classList.add('hidden');
-    pills.forEach(function (p) { p.classList.remove('focused'); });
-    zone = 'none';
-    animateIn();
-    if (items.length) focusTile(focused); else focusPill(0);
-    refreshApps(false);
+    resetKeys(); resetIdle(); clock();
+    if (!overlay.hidden) closeDialog();
+    refreshApps(false); refreshVpn();
+    if (!document.activeElement || document.activeElement === document.body) focusKey(state.lastFocus);
   }
-
   document.addEventListener('webOSRelaunch', resume);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) resume(); });
-
-  build();
-  refreshApps(false);
-  updateClock();
-  setInterval(updateClock, 10000);
-  watchNetwork();
-  animateIn();
-  zone = 'none';
-  if (items.length) focusTile(0); else focusPill(0);
-})();
+  document.addEventListener('visibilitychange', function () { if (document.hidden) { resetKeys(); vpnRequest++; } else resume(); });
+  window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);
+  appearance(); renderApps(); fit(); clock(); resetIdle(); focusKey(state.lastFocus); refreshApps(false); refreshVpn();
+  setInterval(clock, 10000); setInterval(refreshVpn, 20000);
+}());

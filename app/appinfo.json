@@ -1,10 +1,10 @@
 {
   "id": "com.gathin.tvhome",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "vendor": "tv-vibehack",
   "type": "web",
   "main": "index.html",
-  "title": "我的桌面",
+  "title": "我的空间",
   "icon": "icon.png",
   "largeIcon": "largeIcon.png",
   "bgColor": "#000000",
@@ -12,5 +12,8 @@
   "resolution": "1920x1080",
   "disableBackHistoryAPI": true,
   "noSplashOnLaunch": true,
-  "requiredACG": ["application.launcher", "network.query"]
+  "requiredACG": [
+    "application.launcher",
+    "network.query"
+  ]
 }
