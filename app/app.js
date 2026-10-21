@@ -111,7 +111,6 @@
         if (!app.icon) image.src = app.installedIcon;
         button.appendChild(image);
       } else { var mark = document.createElement('span'); mark.className = app.style === 'prime' ? 'prime-wordmark' : 'generic-mark'; mark.textContent = app.style === 'prime' ? 'prime video' : app.name.charAt(0); button.appendChild(mark); }
-      var arrow = icon('arrow-up-right.svg'); arrow.className = 'tile-arrow'; button.appendChild(arrow);
       var copy = document.createElement('span'); copy.className = 'app-copy';
       var title = document.createElement('strong'); title.textContent = app.name; copy.appendChild(title);
       if (app.subtitle && ids.length < 6) { var small = document.createElement('small'); small.textContent = app.subtitle; copy.appendChild(small); }

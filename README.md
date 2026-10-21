@@ -1,14 +1,12 @@
 # LG webOS 中文桌面
 
-为 LG webOS 电视提供磁贴布局的中文桌面，并在已 root 的电视上接管 Home 键、记住关机前的新桌面或 HDMI 输入源。当前源码版本为 **1.1.0**。
+为 LG webOS 电视提供磁贴布局的中文桌面，并在已 root 的电视上接管 Home 键、记住关机前的新桌面或 HDMI 输入源。当前源码版本为 **1.1.1**。
 
 本项目从 [webos-vibehack](https://github.com/OmkarK97/webos-vibehack) 起步，补充中文字体回退、电视端按键助手和界面恢复。不需要电脑常开。
 
 ## 当前桌面
 
-| 浅色桌面 | 19:00 自动切换后的深色桌面 |
-|---|---|
-| ![1.1.0 浅色桌面，LG C5 实机截图](docs/images/tile-home.png) | ![1.1.0 深色桌面，LG C5 实机截图](docs/images/tile-home-dark.png) |
+![1.1.1 磁贴桌面，LG C5 实机截图](docs/images/tile-home-clean.png)
 
 左侧直达常用 HDMI，右侧放置最多六个常用应用。底部提供全部应用、输入源、VPN 和设置入口。自动主题按电视本地时间切换：07:00 至 19:00 使用浅色，其余时间使用深色，也可手动固定。设置中可选择山谷、雾峰或纯色背景。
 

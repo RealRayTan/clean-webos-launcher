@@ -20,19 +20,17 @@
         <div class="computer-photo"></div><div class="computer-shade"></div>
         <span class="device-badge"><img src="assets/device-desktop.svg" alt="">常用输入源</span>
         <div class="computer-label"><span class="device-port">HDMI 4</span><h2>电脑</h2><p>切换到电脑输入源</p></div>
-        <span class="open-arrow"><img src="assets/arrow-up-right.svg" alt=""></span>
       </button>
       <div id="apps" class="apps" aria-label="常用应用"></div>
     </section>
 
     <nav class="utilities" aria-label="桌面工具">
-      <button id="all" data-key="all" class="utility"><span class="utility-icon"><img src="assets/layout-grid.svg" alt=""></span><span><strong>全部应用</strong><small>查看与管理</small></span><img class="utility-arrow" src="assets/arrow-up-right.svg" alt=""></button>
-      <button id="inputs" data-key="inputs" class="utility"><span class="utility-icon"><img src="assets/plug-connected.svg" alt=""></span><span><strong>输入源</strong><small>HDMI 与直播电视</small></span><img class="utility-arrow" src="assets/arrow-up-right.svg" alt=""></button>
-      <button id="network" data-key="network" class="utility"><span class="utility-icon"><img src="assets/shield-lock.svg" alt=""></span><span><strong>网络连接</strong><small id="vpnLabel">打开 Alcyone VPN</small></span><img class="utility-arrow" src="assets/arrow-up-right.svg" alt=""></button>
-      <button id="appearance" data-key="appearance" class="utility"><span class="utility-icon"><img src="assets/settings.svg" alt=""></span><span><strong>设置</strong><small>外观与桌面</small></span><img class="utility-arrow" src="assets/arrow-up-right.svg" alt=""></button>
+      <button id="all" data-key="all" class="utility"><span class="utility-icon"><img src="assets/layout-grid.svg" alt=""></span><span><strong>全部应用</strong><small>查看与管理</small></span></button>
+      <button id="inputs" data-key="inputs" class="utility"><span class="utility-icon"><img src="assets/plug-connected.svg" alt=""></span><span><strong>输入源</strong><small>HDMI 与直播电视</small></span></button>
+      <button id="network" data-key="network" class="utility"><span class="utility-icon"><img src="assets/shield-lock.svg" alt=""></span><span><strong>网络连接</strong><small id="vpnLabel">打开 Alcyone VPN</small></span></button>
+      <button id="appearance" data-key="appearance" class="utility"><span class="utility-icon"><img src="assets/settings.svg" alt=""></span><span><strong>设置</strong><small>外观与桌面</small></span></button>
     </nav>
 
-    <footer class="footer"><span></span><div><span class="key">↑↓←→</span> 选择<span class="key enter">确认</span> 打开<span class="key">长按确认</span> 排序</div></footer>
 
     <div id="overlay" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="dialog-head"><div><p id="dialog-kicker" class="eyebrow">我的空间</p><h2 id="dialog-title">全部应用</h2></div><button id="close" class="icon-button" aria-label="关闭"><img src="assets/x.svg" alt=""></button></header><div id="dialog-body"></div><p class="dialog-foot">方向键选择 · 确认键操作 · 返回键关闭</p></section></div>
     <div id="toast" role="status"></div>
