@@ -2,7 +2,7 @@
  * tvOS style home for webOS: black, a pinned dock row, an app grid, and one glass highlight that
  * springs between tiles. A port of the Android launcher in ../../launcher.
  *
- * webOS does not let third-party apps list installed apps, so sync-apps.py writes them into apps.js.
+ * The root helper supplies installed apps; apps.js remains the offline fallback.
  */
 (function () {
   'use strict';
@@ -41,8 +41,17 @@
   var $ = function (id) { return document.getElementById(id); };
   var stage = $('stage'), tilesEl = $('tiles'), glass = $('glass'), hero = $('hero');
   var ambients = [$('ambientA'), $('ambientB')], ambientFront = 0, ambientColor = null;
-  var pills = [$('btnInputs'), $('btnWifi'), $('btnSettings')];
+  var pills = [$('btnApps'), $('btnInputs'), $('btnWifi'), $('btnSettings')];
   var panel = $('inputsPanel');
+  var appsPanel = $('appsPanel'), appsRows = $('appsRows');
+  var managedFocus = 0, managedRows = [], refreshingApps = false;
+  var hiddenApps;
+  try { hiddenApps = JSON.parse(localStorage.getItem('tvhome.hidden')); } catch (e) {}
+  if (!Array.isArray(hiddenApps)) hiddenApps = (CONFIG.hiddenApps || []).slice();
+  try {
+    var cachedApps = JSON.parse(localStorage.getItem('tvhome.catalog'));
+    if (Array.isArray(cachedApps)) window.TV_APPS.apps = cachedApps;
+  } catch (e) {}
 
   var items = [];               // {app, el, color}
   var zone = 'grid';            // 'grid' | 'top' | 'inputs'
@@ -92,7 +101,7 @@
     var byId = {};
     all.forEach(function (a) { byId[a.id] = a; });
     var hidden = {};
-    (CONFIG.hiddenApps || []).forEach(function (id) { hidden[id] = true; });
+    hiddenApps.forEach(function (id) { hidden[id] = true; });
     var byTitle = function (a, b) { return a.title.toLowerCase() < b.title.toLowerCase() ? -1 : 1; };
 
     // An order arranged on the TV wins, until dockApps in config.js changes.
@@ -156,15 +165,18 @@
       name.textContent = app.title;
       el.appendChild(name);
       el.addEventListener('mouseover', function () {
-        if (zone !== 'inputs' && !editing) focusTile(items.indexOf(item));
+        if (zone !== 'inputs' && zone !== 'apps' && !editing) focusTile(items.indexOf(item));
       });
       el.addEventListener('click', function () {
+        if (zone === 'apps') return;
         if (editing) finishEdit(true);
         else launch(app.id, app.title);
       });
       tilesEl.appendChild(el);
       return item;
     });
+    document.body.classList.toggle('emptyApps', items.length === 0);
+    if (!items.length) { hideHero(); offset = 0; stage.style.transform = 'none'; }
     layout();
   }
 
@@ -445,9 +457,92 @@
   }
 
   function activatePill(i) {
-    if (i === 0) showInputs();
-    else if (i === 1) launch('com.palm.app.settings', 'Settings', { target: 'network' });
+    if (i === 0) showApps();
+    else if (i === 1) showInputs();
+    else if (i === 2) launch('com.palm.app.settings', 'Settings', { target: 'network' });
     else launch('com.palm.app.settings', 'Settings');
+  }
+
+  function rebuildApps() {
+    var id = items[focused] && items[focused].app.id;
+    hideGlass();
+    build();
+    focused = Math.max(0, items.map(function (it) { return it.app.id; }).indexOf(id));
+    animateIn();
+    if (zone !== 'apps') {
+      if (items.length) focusTile(focused);
+      else focusPill(0);
+    }
+  }
+
+  function refreshApps(notify) {
+    if (refreshingApps) return;
+    refreshingApps = true;
+    luna('luna://com.gathin.tvhome.service/listApps', {}, function (res) {
+      refreshingApps = false;
+      if (res.returnValue !== true || !Array.isArray(res.apps) || !res.apps.length) {
+        if (notify) toast('刷新失败，保留原有列表');
+        return;
+      }
+      var changed = JSON.stringify(TV_APPS.apps) !== JSON.stringify(res.apps);
+      TV_APPS.apps = res.apps;
+      try { localStorage.setItem('tvhome.catalog', JSON.stringify(res.apps)); } catch (e) {}
+      if (changed && !document.hidden) rebuildApps();
+      if (zone === 'apps') renderManagedApps();
+      if (notify) toast('已刷新应用列表');
+    });
+  }
+
+  function showApps() {
+    panel.classList.add('hidden');
+    setZone('apps');
+    appsPanel.classList.remove('hidden');
+    managedFocus = 0;
+    renderManagedApps();
+  }
+
+  function renderManagedApps() {
+    appsRows.innerHTML = '';
+    managedRows = [];
+    function row(title, state, action) {
+      var el = document.createElement('div'), name = document.createElement('span'), status = document.createElement('span');
+      el.className = 'appManageRow';
+      name.className = 'appTitle'; name.textContent = title;
+      status.className = 'appState'; status.textContent = state;
+      el.appendChild(name); el.appendChild(status); appsRows.appendChild(el);
+      var index = managedRows.length;
+      el.addEventListener('mouseover', function () { focusManaged(index); });
+      el.addEventListener('click', action);
+      managedRows.push({ el: el, action: action });
+    }
+    row('刷新已安装应用', '', function () { refreshApps(true); });
+    TV_APPS.apps.forEach(function (app) {
+      row(app.title, hiddenApps.indexOf(app.id) < 0 ? '已显示' : '已隐藏', function () {
+        var index = hiddenApps.indexOf(app.id), next = hiddenApps.slice();
+        if (index < 0) next.push(app.id); else next.splice(index, 1);
+        try { localStorage.setItem('tvhome.hidden', JSON.stringify(next)); }
+        catch (e) { toast('保存失败，请稍后重试'); return; }
+        hiddenApps = next;
+        rebuildApps();
+        renderManagedApps();
+      });
+    });
+    focusManaged(managedFocus);
+  }
+
+  function focusManaged(index) {
+    if (managedRows[managedFocus]) managedRows[managedFocus].el.classList.remove('focused');
+    managedFocus = Math.max(0, Math.min(index, managedRows.length - 1));
+    var el = managedRows[managedFocus].el;
+    el.classList.add('focused');
+    var top = el.offsetTop - appsRows.offsetTop;
+    if (top < appsRows.scrollTop) appsRows.scrollTop = top;
+    else if (top + el.offsetHeight > appsRows.scrollTop + appsRows.clientHeight) appsRows.scrollTop = top + el.offsetHeight - appsRows.clientHeight;
+  }
+
+  function hideApps() {
+    appsPanel.classList.add('hidden');
+    focusPill(0);
   }
 
   // ---- inputs dropdown -----------------------------------------------------------------------
@@ -497,7 +592,7 @@
   function hideInputs() {
     panel.classList.add('hidden');
     zone = 'none';
-    focusPill(0);
+    focusPill(1);
   }
 
   // ---- rearranging ---------------------------------------------------------------------------
@@ -554,7 +649,13 @@
     var k = e.keyCode;
     if (k === KEY.OK && okDown) { e.preventDefault(); return; }   // key repeat while held
     if (k === KEY.OK) okDown = true;
-    if (editing) {
+    if (zone === 'apps') {
+      if (k === KEY.UP) focusManaged(managedFocus - 1);
+      else if (k === KEY.DOWN) focusManaged(managedFocus + 1);
+      else if (k === KEY.OK) managedRows[managedFocus].action();
+      else if (k === KEY.BACK || k === KEY.ESC) hideApps();
+      else return;
+    } else if (editing) {
       if (k === KEY.LEFT) moveTo(focused - 1);
       else if (k === KEY.RIGHT) moveTo(focused + 1);
       else if (k === KEY.UP) moveTo(focused - COLUMNS);
@@ -571,7 +672,7 @@
     } else if (zone === 'top') {
       if (k === KEY.LEFT) focusPill(pillFocus - 1);
       else if (k === KEY.RIGHT) focusPill(pillFocus + 1);
-      else if (k === KEY.DOWN) focusTile(rowOf(focused) === 0 ? focused : 0);
+      else if (k === KEY.DOWN && items.length) focusTile(rowOf(focused) === 0 ? focused : 0);
       else if (k === KEY.OK) activatePill(pillFocus);
       else if (k === KEY.BACK) { /* home screen: Back goes nowhere */ }
       else return;
@@ -593,8 +694,11 @@
   });
 
   pills.forEach(function (p, i) {
-    p.addEventListener('mouseover', function () { if (zone !== 'inputs') focusPill(i); });
-    p.addEventListener('click', function () { activatePill(i); });
+    p.addEventListener('mouseover', function () { if (zone !== 'inputs' && zone !== 'apps') focusPill(i); });
+    p.addEventListener('click', function () {
+      if (zone === 'apps') { hideApps(); if (i === 0) return; }
+      activatePill(i);
+    });
   });
 
   // ---- lifecycle -----------------------------------------------------------------------------
@@ -606,21 +710,24 @@
     okTimer = null;
     if (editing) finishEdit(false);
     updateClock();
-    if (zone === 'inputs') panel.classList.add('hidden');
+    panel.classList.add('hidden');
+    appsPanel.classList.add('hidden');
     pills.forEach(function (p) { p.classList.remove('focused'); });
     zone = 'none';
     animateIn();
-    focusTile(focused);
+    if (items.length) focusTile(focused); else focusPill(0);
+    refreshApps(false);
   }
 
   document.addEventListener('webOSRelaunch', resume);
   document.addEventListener('visibilitychange', function () { if (!document.hidden) resume(); });
 
   build();
+  refreshApps(false);
   updateClock();
   setInterval(updateClock, 10000);
   watchNetwork();
   animateIn();
   zone = 'none';
-  focusTile(0);
+  if (items.length) focusTile(0); else focusPill(0);
 })();

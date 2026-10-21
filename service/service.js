@@ -42,6 +42,7 @@ service.register('status', function (message) {
   message.respond({ returnValue: true, pid: process.pid, root: process.getuid() === 0, enabled: enabled(), inputDevices: inputFiles.length, startupMode: 'remember-desktop-or-input', resume: resumeStatus(), returnOrigin: returnOrigin.status() });
 });
 service.register('open', function (message) { launch('requested'); message.respond({ returnValue: true }); });
+require('./app-catalog').register(service);
 
 // Read events without grabbing them: every native button remains available.
 // HOME release opens our app; a hold leaves LG's original Home available.

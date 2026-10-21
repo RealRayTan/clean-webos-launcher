@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch the TV's apps, icons and HDMI inputs into app/apps.js and app/icons/.
 
-webOS does not let a third-party app list installed apps, so the launcher reads them from here.
+The root helper refreshes installed apps at runtime. This snapshot is the offline fallback.
 
     python3 sync-apps.py 192.168.1.50          # sync
     python3 sync-apps.py 192.168.1.50 --list   # just print app ids and titles

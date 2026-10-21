@@ -305,6 +305,25 @@ body.editing #glass { opacity: 0 !important; }
 
 .separator { height: 2px; margin: 12px 24px; background: rgba(255, 255, 255, 0.12); }
 
+#appsPanel {
+  position: absolute; z-index: 8; right: 92px; top: 200px;
+  width: 680px; max-height: 770px; padding: 28px;
+  background: rgba(24,24,28,0.98); border: 2px solid #555;
+  border-radius: 30px; box-sizing: border-box;
+}
+#appsPanel.hidden { display: none; }
+#emptyApps { display: none; position: absolute; width: 100%; top: 45%; text-align: center; font-size: 40px; color: #eee; }
+#emptyApps small { display: block; margin-top: 20px; font-size: 28px; color: #aaa; }
+body.emptyApps #emptyApps { display: block; }
+#appsPanel h2 { margin: 0 16px 10px; font-size: 34px; }
+#appsPanel p { margin: 0 16px 18px; font-size: 24px; color: #bbb; line-height: 1.5; }
+#appsRows { max-height: 565px; overflow-y: auto; }
+.appManageRow { display: flex; align-items: center; justify-content: space-between; min-height: 70px; padding: 8px 18px; border-radius: 16px; font-size: 28px; }
+.appManageRow .appTitle { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-right: 22px; }
+.appManageRow .appState { flex-shrink: 0; font-size: 24px; color: #aaa; }
+.appManageRow.focused { background: white; color: black; }
+.appManageRow.focused .appState { color: #444; }
+
 /* ---- toast ----------------------------------------------------------------------------------- */
 
 #toast {
