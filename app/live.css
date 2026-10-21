@@ -1,0 +1,86 @@
+.tile{transition:transform 170ms cubic-bezier(.22,1,.36,1),box-shadow 170ms ease-out}
+.tile:hover,.tile:focus{transform:translateY(-3px) scale(1.016);box-shadow:0 18px 42px #0005}
+.scene[data-theme=light] .tile:hover,.scene[data-theme=light] .tile:focus{box-shadow:0 16px 35px #25322538,0 0 0 1px #435d3e35}
+.tile:active{transform:scale(.987)}
+.app-tile.live-tile{padding:0;display:block;background:transparent;border:0;overflow:visible;isolation:auto;perspective:1400px}
+.tile-turner{position:relative;display:block;width:100%;height:100%;transform-style:preserve-3d}
+.tile-face{position:absolute;inset:0;display:flex;border-radius:18px;overflow:hidden;-webkit-backface-visibility:hidden;backface-visibility:hidden}
+.tile-face--brand{padding:28px 30px;flex-direction:column;justify-content:space-between;align-items:flex-start;background:var(--brand-bg);color:var(--brand-ink);border:1px solid #ffffff0c}
+.app-bili{--brand-bg:#bfd4dd;--brand-ink:#1f3745}.app-youtube{--brand-bg:#e8e5dc;--brand-ink:#2d302b}.app-netflix{--brand-bg:#2e2929;--brand-ink:#eee6df}.app-plx{--brand-bg:#2b3430;--brand-ink:#e9ece3}.app-apple{--brand-bg:#dad5c4;--brand-ink:#33392e}
+[data-theme=light] .tile-face--brand{border-color:#35402d26}[data-theme=light] .app-youtube .tile-face--brand{background:#d8dbd0;border-color:#aab39f}
+.tile-face--content{background:#18221d;transform:rotateY(180deg);color:#fff}
+[data-axis=X] .tile-face--content{transform:rotateX(180deg)}
+.live-art{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 42%;pointer-events:none}
+.app-youtube .live-art{object-position:50% 32%}.app-apple .live-art{object-position:50% 28%}.app-netflix .live-art{object-position:58% 44%}
+.live-shade{position:absolute;inset:0;background:linear-gradient(180deg,#08150c55 0%,transparent 30%,#07130c5c 48%,#061009ef 100%)}
+.live-source{position:absolute;left:25px;top:21px;font-size:16px;font-weight:450;letter-spacing:.9px;color:#fffffff0;text-shadow:0 1px 8px #0008}
+.live-copy{position:absolute;left:25px;right:20px;bottom:24px;display:flex;flex-direction:column;gap:7px;text-shadow:0 1px 8px #0005}
+.app-tile .live-title{font-size:28px;line-height:1.23;font-weight:500;letter-spacing:.4px;max-width:100%;text-wrap:balance}
+.app-tile .live-subtitle{font-size:16px;line-height:1.4;color:#e0e5db;opacity:.82;letter-spacing:.2px}
+.app-bili .live-title,.app-youtube .live-title{font-size:32px}
+.motion-description{font-size:20px;margin:0 0 24px}
+@media(prefers-reduced-motion:reduce){.tile:hover,.tile:focus{transform:none}.tile-turner{transform:none!important}.tile-face--content{display:none}}
+
+.app-tile .live-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden;text-wrap:wrap;font-size:26px;line-height:1.22}.app-bili .live-title,.app-youtube .live-title{font-size:29px}.live-source{right:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:15px}.live-subtitle{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.content-sources{margin:0 0 22px;border-top:1px solid var(--line)}.content-source-line{padding:14px 0;display:flex;justify-content:space-between;gap:20px;border-bottom:1px solid var(--line)}.content-source-line strong{font-size:20px;font-weight:450}.content-source-line small,.content-source-error{font-size:17px;color:var(--muted)}.content-source-error{display:block;margin:4px 0 12px}.content-credit{margin-left:12px}.content-detail{display:grid;grid-template-columns:320px 1fr;gap:28px;margin-bottom:28px}.content-detail img{width:320px;height:200px;object-fit:cover;border-radius:12px}.content-detail h3{font-size:30px;line-height:1.4;margin:0 0 16px}.content-detail p{font-size:21px;color:var(--muted);line-height:1.6;margin:6px 0}
+
+.content-detail~.panel-description{margin:20px 0 0}
+
+/* Keep dialog navigation stable while its contents scroll. */
+.dialog{display:flex;flex-direction:column;max-height:860px;overflow:hidden;padding:44px 48px;box-shadow:none}
+.dialog-head{flex-shrink:0;margin-bottom:32px}
+.dialog-head .eyebrow{display:none}
+#dialog-body{min-height:0;overflow-y:auto;overflow-x:hidden;padding:4px 8px 8px;margin:0 -8px;scrollbar-width:thin;scrollbar-color:var(--muted) transparent}
+#dialog-body::-webkit-scrollbar{width:6px}
+#dialog-body::-webkit-scrollbar-thumb{background:var(--muted);border-radius:6px}
+.settings-row{min-height:100px;margin:0;padding:20px 0;border-bottom:1px solid var(--line);gap:32px}
+.settings-row>span{font-size:26px}
+.settings-row .choice{min-width:108px;min-height:64px}
+.settings-row .choice-group{gap:12px}
+.settings-row:nth-child(2) .choice{min-width:152px;min-height:100px;background-size:cover;background-position:center;text-shadow:0 1px 5px #000}
+.settings-row [data-key=wallpaper-valley]{background-image:linear-gradient(#06100944,#06100988),url(assets/valley.jpg);color:#fff}
+.settings-row [data-key=wallpaper-peaks]{background-image:linear-gradient(#06100944,#06100988),url(assets/peaks.jpg);color:#fff}
+.settings-row [data-key=wallpaper-plain]{background-color:#27322b;color:#fff}
+.settings-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:32px}
+.settings-actions .list-item{font-size:24px;min-height:88px;justify-content:center;padding:16px}
+.content-source-line{padding:26px 0;align-items:center;gap:32px}
+.content-source-line strong{font-size:24px}
+.content-source-line small{font-size:20px;white-space:nowrap}
+.content-sources{margin-bottom:32px}
+.content-detail{margin-bottom:32px}
+.content-detail h3{font-size:32px;line-height:1.4}
+/* A continuous two-row shelf retains card proportions at every app count. */
+.board{grid-template-columns:620px minmax(0,1fr)}
+.app-shelf{min-width:0;position:relative;margin:-10px;height:460px}
+.apps{position:relative;width:100%;height:460px;padding:10px;grid-template-columns:360px;grid-auto-columns:300px;grid-template-rows:211px 211px;gap:18px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;overscroll-behavior-x:contain}
+.apps::-webkit-scrollbar{display:none}
+.apps .app-tile{width:100%;height:211px;min-width:0}
+.apps .empty-add{grid-column:1;grid-row:1}
+.apps .app-copy{width:100%}
+.apps .app-copy strong{font-size:28px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.app-alcyone{background:#211630;color:#f0e8fa}
+.app-homebrew{background:#62243e;color:#ffedf4}
+.app-alcyone .brand,.app-homebrew .brand,.app-generic .brand{width:64px;height:64px;object-fit:contain}
+.app-alcyone .app-copy small,.app-homebrew .app-copy small{opacity:1;color:inherit}
+.apps .tile:focus{outline:3px solid var(--focus);outline-offset:3px}
+.app-shelf{--shelf-start:#000;--shelf-end:#000;-webkit-mask-image:linear-gradient(to right,var(--shelf-start),#000 32px,#000 calc(100% - 32px),var(--shelf-end));mask-image:linear-gradient(to right,var(--shelf-start),#000 32px,#000 calc(100% - 32px),var(--shelf-end))}
+.app-shelf[data-more-before=true]{--shelf-start:transparent}
+.app-shelf[data-more-after=true]{--shelf-end:transparent}
+
+.scene[data-theme=light] .palette-auto{--app-bg:var(--app-bg-light);--app-ink:var(--app-ink-light)}
+.scene[data-theme=dark] .palette-auto{--app-bg:var(--app-bg-dark);--app-ink:var(--app-ink-dark)}
+.scene .app-tile.palette-auto{background:var(--app-bg);color:var(--app-ink)}
+.scene .palette-auto .tile-face--brand{background:var(--app-bg);color:var(--app-ink)}
+.scene .palette-auto .app-copy small{opacity:1;color:var(--app-ink)}
+
+/* Explicit foregrounds also avoid inherited-color artifacts during webOS 3D flips. */
+.scene .palette-auto .tile-face--brand .app-copy strong{color:var(--app-ink)}
+.scene[data-theme=dark] .palette-auto.app-bili .tile-face--brand .brand,
+.scene[data-theme=dark] .palette-auto.app-apple .tile-face--brand .brand{filter:brightness(0) invert(1)}
+
+#contentCredits{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:24px}
+#contentCredits .content-credit{margin:0}
+.source-attribution{flex-basis:100%;font-size:18px;line-height:1.5;color:var(--muted);margin:12px 0 0}
+
+.tmdb-logo{display:block;width:110px;height:auto;filter:none}
+
+.dialog[data-view=sources] .content-source-line{padding:22px 0}

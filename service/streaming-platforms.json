@@ -1,0 +1,23 @@
+[
+  {
+    "key": "prime",
+    "label": "Prime Video",
+    "appIds": ["amazon"],
+    "titleAliases": ["Prime Video", "Amazon Prime Video"],
+    "providerNames": ["Amazon Prime Video"]
+  },
+  {
+    "key": "disney",
+    "label": "Disney+",
+    "appIds": [],
+    "titleAliases": ["Disney+", "Disney Plus"],
+    "providerNames": ["Disney Plus", "Disney+"]
+  },
+  {
+    "key": "hbo",
+    "label": "HBO Max",
+    "appIds": [],
+    "titleAliases": ["HBO Max"],
+    "providerNames": ["HBO Max", "Max"]
+  }
+]

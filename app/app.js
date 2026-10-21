@@ -13,7 +13,9 @@
     netflix: { name: 'Netflix', icon: 'netflix.svg', style: 'netflix' },
     'com.beb.plxnative': { name: 'PlxNative', style: 'plx' },
     'com.apple.appletv': { name: 'Apple TV', icon: 'appletv.svg', style: 'apple' },
-    amazon: { name: 'Prime Video', style: 'prime' }
+    amazon: { name: 'Prime Video', style: 'prime' },
+    'com.alcyone.vpn.singbox': { name: 'Alcyone', subtitle: 'VPN', style: 'alcyone' },
+    'org.webosbrew.hbchannel': { name: 'Homebrew', subtitle: 'Channel', style: 'homebrew' }
   };
   function sanitizeApps(value) {
     if (!Array.isArray(value)) return [];
@@ -30,18 +32,19 @@
   try {
     var saved = JSON.parse(localStorage.getItem(KEY));
     if (saved && ['auto', 'light', 'dark'].indexOf(saved.theme) >= 0 && ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) >= 0 && Array.isArray(saved.apps)) {
-      state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: saved.apps.filter(function (id, i, all) { return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i; }).slice(0, 6), lastFocus: saved.lastFocus || 'computer' };
+      state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: saved.apps.filter(function (id, i, all) { return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i; }), lastFocus: saved.lastFocus || 'computer' };
     } else {
       var hidden = JSON.parse(localStorage.getItem('tvhome.hidden'));
       if (!Array.isArray(hidden)) hidden = CONFIG.hiddenApps || [];
       var legacy = JSON.parse(localStorage.getItem('tvhome.order'));
-      if (legacy && Array.isArray(legacy.ids)) state.apps = legacy.ids.filter(function (id) { return hidden.indexOf(id) < 0; }).slice(0, 6);
+      if (legacy && Array.isArray(legacy.ids)) state.apps = legacy.ids.filter(function (id) { return hidden.indexOf(id) < 0; });
       else state.apps = defaults.filter(function (id) { return hidden.indexOf(id) < 0; });
     }
   } catch (error) {}
   var dialogType = '', returnKey = 'computer', loadingApps = false, lastLaunch = 0, toastTimer, idleTimer;
   var okDown = false, okTarget = null, okTimer = null, orderDraft = null, movingId = null;
   var vpnRequest = 0;
+  function homeIds() { return state.apps.filter(function (id) { return !!installed(id); }); }
   document.body.classList.toggle('on-tv', TVDevice.available);
   function icon(file) { var img = document.createElement('img'); img.src = 'assets/' + file; img.alt = ''; return img; }
   function toast(text) { $('toast').textContent = text; $('toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { $('toast').classList.remove('visible'); }, 2400); }
@@ -89,22 +92,38 @@
     var target = focusables().filter(function (el) { return el.dataset.key === key; })[0] || (overlay.hidden ? $('computer') : body.querySelector('button')) || $('close');
     target.focus({ preventScroll: true });
   }
+  function revealApp(target) {
+    var shelf = $('apps');
+    if (!overlay.hidden || !shelf.contains(target)) return;
+    var left = shelf.scrollLeft, inset = 10;
+    if (target.offsetLeft < left + inset) left = target.offsetLeft - inset;
+    else if (target.offsetLeft + target.offsetWidth > left + shelf.clientWidth - inset) left = target.offsetLeft + target.offsetWidth - shelf.clientWidth + inset;
+    shelf.scrollTo({ left: left, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }
+  function updateShelfEdges() {
+    var shelf = $('apps'), frame = shelf.parentElement;
+    frame.dataset.moreBefore = String(shelf.scrollLeft > 2);
+    frame.dataset.moreAfter = String(shelf.scrollLeft + shelf.clientWidth < shelf.scrollWidth - 2);
+  }
   function keepPanelFocusVisible(target) {
-    if (overlay.hidden || !panel.contains(target)) return;
-    var a = target.getBoundingClientRect(), b = panel.getBoundingClientRect(), scale = b.width / panel.offsetWidth;
-    if (a.top < b.top + 20 * scale) panel.scrollTop += (a.top - b.top) / scale - 20;
-    else if (a.bottom > b.bottom - 20 * scale) panel.scrollTop += (a.bottom - b.bottom) / scale + 20;
+    if (overlay.hidden || !body.contains(target)) return;
+    var a = target.getBoundingClientRect(), b = body.getBoundingClientRect(), scale = b.width / body.offsetWidth;
+    if (a.top < b.top + 20 * scale) body.scrollTop += (a.top - b.top) / scale - 20;
+    else if (a.bottom > b.bottom - 20 * scale) body.scrollTop += (a.bottom - b.bottom) / scale + 20;
   }
   function renderApps() {
-    var ids = state.apps.filter(function (id) { return !!installed(id); });
-    var widths = { 1: [7], 2: [7, 7], 3: [4, 3, 7], 4: [4, 3, 3, 4], 5: [4, 3, 2, 2, 3], 6: [3, 2, 2, 3, 2, 2] };
+    PublicContent.setApps(catalog);
+    var ids = homeIds();
+    var scroll = $('apps').scrollLeft;
     $('apps').innerHTML = '';
     ids.forEach(function (id, index) {
       var app = appInfo(id), button = document.createElement('button');
       button.className = 'tile app-tile app-' + app.style; button.dataset.key = id;
       button.setAttribute('aria-label', '打开 ' + app.name);
-      button.style.gridColumn = 'span ' + widths[ids.length][index];
-      if (ids.length === 1) button.style.gridRow = 'span 2';
+      var column = index < 6 ? index % 3 : 3 + Math.floor((index - 6) / 2);
+      var row = index < 6 ? Math.floor(index / 3) : (index - 6) % 2;
+      button.dataset.column = column; button.dataset.row = row;
+      button.style.gridColumn = String(column + 1); button.style.gridRow = String(row + 1);
       if (app.icon || app.installedIcon) {
         var image = app.icon ? icon(app.icon) : document.createElement('img');
         image.className = 'brand' + (app.icon ? '' : ' installed-icon'); image.alt = '';
@@ -113,13 +132,17 @@
       } else { var mark = document.createElement('span'); mark.className = app.style === 'prime' ? 'prime-wordmark' : 'generic-mark'; mark.textContent = app.style === 'prime' ? 'prime video' : app.name.charAt(0); button.appendChild(mark); }
       var copy = document.createElement('span'); copy.className = 'app-copy';
       var title = document.createElement('strong'); title.textContent = app.name; copy.appendChild(title);
-      if (app.subtitle && ids.length < 6) { var small = document.createElement('small'); small.textContent = app.subtitle; copy.appendChild(small); }
-      button.appendChild(copy); button.onclick = function () { launch(id); }; $('apps').appendChild(button);
+      if (app.subtitle) { var small = document.createElement('small'); small.textContent = app.subtitle; copy.appendChild(small); }
+      button.appendChild(copy);
+      TilePalette.apply(button, id, app.icon ? 'assets/' + app.icon : app.installedIcon, installed(id).iconColor);
+      TileMotion.attach(button, id); button.onclick = function () { if (!showContent(id)) launch(id); }; $('apps').appendChild(button);
     });
     if (!ids.length) {
       var empty = document.createElement('button'); empty.className = 'tile app-tile empty-add'; empty.dataset.key = 'add'; empty.appendChild(icon('plus.svg'));
       var label = document.createElement('strong'); label.textContent = '添加常用应用'; empty.appendChild(label); empty.onclick = function () { openDialog('manage'); }; $('apps').appendChild(empty);
     }
+    $('apps').scrollLeft = scroll;
+    updateShelfEdges();
     $('all').querySelector('small').textContent = catalog.length + ' 个应用';
   }
   function refreshApps(notify) {
@@ -162,25 +185,43 @@
       if (key && overlay.hidden) commit({ lastFocus: key });
     });
   }
-  function closeDialog() { overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; focusKey(returnKey); }
+  function closeDialog() { if (dialogType === 'sources') { openDialog('settings', 'sources'); return; } overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; focusKey(returnKey); }
   function openDialog(type, key) {
     if (overlay.hidden) returnKey = document.activeElement && document.activeElement.dataset.key || 'computer';
-    overlay.hidden = false; dialogType = type; body.innerHTML = ''; panel.scrollTop = 0;
-    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '让桌面更像你', inputs: '选择输入源' }[type];
+    overlay.hidden = false; dialogType = type; body.innerHTML = ''; body.scrollTop = 0; panel.dataset.view = type;
+    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', content: '内容详情' }[type];
     $('dialog-kicker').textContent = '我的空间';
-    $('overlay').querySelector('.dialog-foot').textContent = '方向键选择 · 确认键操作 · 返回键关闭';
+
     if (type === 'all' || type === 'manage') renderCatalog(type === 'manage');
     if (type === 'settings') renderSettings();
+    if (type === 'sources') PublicContent.settings(body);
     if (type === 'inputs') renderInputs();
     if (type === 'order') renderOrder();
     focusKey(key || (body.querySelector('button') && body.querySelector('button').dataset.key));
+  }
+  function showContent(id) {
+    var item = TileMotion.selected(id);
+    if (!item) return false;
+    openDialog('content');
+    $('dialog-kicker').textContent = item.providerLabel;
+    var detail = document.createElement('div'); detail.className = 'content-detail';
+    var image = document.createElement('img'); image.src = item.image; image.alt = ''; detail.appendChild(image);
+    var copy = document.createElement('div');
+    var title = document.createElement('h3'); title.textContent = item.title; copy.appendChild(title);
+    var info = document.createElement('p'); info.textContent = item.subtitle; copy.appendChild(info);
+    detail.appendChild(copy); body.appendChild(detail);
+    var label = item.sourceActionLabel;
+    body.appendChild(button('打开应用', 'choice', 'content-open-app', function () { launch(id); }));
+    body.appendChild(button(label, 'choice content-credit', 'content-source', function () { launch('com.webos.app.browser', { target: item.sourceUrl }); }));
+    focusKey('content-source');
+    return true;
   }
   function paragraph(text) { var p = document.createElement('p'); p.className = 'panel-description'; p.textContent = text; body.appendChild(p); }
   function button(text, className, key, action) {
     var item = document.createElement('button'); item.className = className; item.textContent = text; if (key) item.dataset.key = key; item.onclick = action; return item;
   }
   function renderCatalog(manage) {
-    paragraph(manage ? '选择放在首页的应用，最多六个。隐藏图标不会卸载应用。' : '选择应用打开；安装新应用后可以刷新列表。');
+    paragraph(manage ? '选择常用应用' : '选择应用打开；安装新应用后可以刷新列表。');
     var bar = document.createElement('div'); bar.className = 'choice-group'; bar.style.marginBottom = '24px'; body.appendChild(bar);
     if (manage) bar.appendChild(button('调整首页顺序', 'choice', 'reorder', function () { orderDraft = null; movingId = null; openDialog('order'); }));
     else bar.appendChild(button('编辑桌面', 'choice', 'manage', function () { openDialog('manage'); }));
@@ -203,7 +244,6 @@
       row.onclick = function () {
         if (!manage) return launch(app.id);
         var ids = state.apps.slice(), index = ids.indexOf(app.id);
-        if (index < 0 && ids.length === 6) return toast('首页最多放六个应用，请先移除一个');
         if (index < 0) ids.push(app.id); else ids.splice(index, 1);
         if (!commit({ apps: ids })) return;
         renderApps(); openDialog('manage', row.dataset.key);
@@ -231,7 +271,6 @@
     orderDraft.splice(to, 0, orderDraft.splice(from, 1)[0]); openDialog('order', 'order-' + movingId);
   }
   function renderSettings() {
-    paragraph('壁纸只用于桌面，不改变电视的图像设置。');
     function choices(title, key, values) {
       var row = document.createElement('div'); row.className = 'settings-row'; var label = document.createElement('span'); label.textContent = title; row.appendChild(label);
       var group = document.createElement('div'); group.className = 'choice-group'; row.appendChild(group);
@@ -242,11 +281,14 @@
       }); body.appendChild(row);
     }
     choices('主题', 'theme', [['auto', '自动'], ['dark', '深色'], ['light', '浅色']]);
-    paragraph('自动模式按电视本地时间：07:00–19:00 浅色，其他时间深色。手动选择后保持固定。');
     choices('背景', 'wallpaper', [['valley', '山谷'], ['peaks', '雾峰'], ['plain', '纯色']]);
-    body.appendChild(button('编辑首页应用', 'list-item', 'edit-home', function () { openDialog('manage'); }));
-    var system = button('LG 系统设置', 'list-item', 'system-settings', function () { launch('com.palm.app.settings'); }); system.style.marginTop = '12px'; body.appendChild(system);
+    TileMotion.settings(body);
+    var actions = document.createElement('div'); actions.className = 'settings-actions'; body.appendChild(actions);
+    actions.appendChild(button('编辑应用', 'list-item', 'edit-home', function () { openDialog('manage'); }));
+    actions.appendChild(button('内容来源', 'list-item', 'sources', function () { openDialog('sources'); }));
+    actions.appendChild(button('LG 系统设置', 'list-item', 'system-settings', function () { launch('com.palm.app.settings'); }));
   }
+
   function renderInputs() {
     var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
     var inputs = window.TV_APPS && Array.isArray(TV_APPS.inputs) ? TV_APPS.inputs : [];
@@ -259,6 +301,26 @@
   function moveFocus(key) {
     var elements = focusables(), current = document.activeElement;
     if (elements.indexOf(current) < 0) return focusKey('computer');
+    if (overlay.hidden && $('apps').contains(current)) {
+      var row = Number(current.dataset.row), column = Number(current.dataset.column), target;
+      var horizontal = key === 'ArrowLeft' || key === 'ArrowRight', delta = key === 'ArrowRight' || key === 'ArrowDown' ? 1 : -1;
+      var neighbors = Array.prototype.slice.call($('apps').children).filter(function (item) {
+        return horizontal ? Number(item.dataset.row) === row && (Number(item.dataset.column) - column) * delta > 0 : Number(item.dataset.column) === column && Number(item.dataset.row) === row + delta;
+      });
+      if (horizontal) neighbors.sort(function (a, b) { return (Number(a.dataset.column) - Number(b.dataset.column)) * delta; });
+      target = neighbors[0];
+      if (target) { target.focus({ preventScroll: true }); return; }
+      if (key === 'ArrowLeft') { focusKey('computer'); return; }
+      if (key === 'ArrowRight') return;
+    }
+    if (overlay.hidden) {
+      var bounds = $('apps').getBoundingClientRect();
+      elements = elements.filter(function (item) {
+        if (!$('apps').contains(item)) return true;
+        var r = item.getBoundingClientRect();
+        return r.right > bounds.left + 10 && r.left < bounds.right - 10;
+      });
+    }
     var a = current.getBoundingClientRect(), ax = (a.left + a.right) / 2, ay = (a.top + a.bottom) / 2, best, score = Infinity;
     elements.forEach(function (el) {
       if (el === current) return;
@@ -312,7 +374,16 @@
   };
   $('close').onclick = closeDialog;
   overlay.addEventListener('click', function (event) { if (event.target === overlay) closeDialog(); });
-  document.addEventListener('focusin', function (event) { keepPanelFocusVisible(event.target); });
+  document.addEventListener('focusin', function (event) { keepPanelFocusVisible(event.target); revealApp(event.target); });
+  $('apps').addEventListener('scroll', updateShelfEdges, { passive: true });
+  $('apps').addEventListener('wheel', function (event) {
+    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY || event.ctrlKey) return;
+    var shelf = $('apps');
+    if (shelf.scrollWidth <= shelf.clientWidth) return;
+    event.preventDefault();
+    var distance = event.deltaY * (event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? shelf.clientWidth : 1);
+    shelf.scrollLeft += distance; resetIdle();
+  }, { passive: false });
   ['mousedown', 'mousemove', 'wheel'].forEach(function (name) { document.addEventListener(name, resetIdle); });
   function resume() {
     resetKeys(); resetIdle(); clock();
@@ -324,5 +395,6 @@
   document.addEventListener('visibilitychange', function () { if (document.hidden) { resetKeys(); vpnRequest++; } else resume(); });
   window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);
   appearance(); renderApps(); fit(); clock(); resetIdle(); focusKey(state.lastFocus); refreshApps(false); refreshVpn();
+  TileMotion.start();
   setInterval(clock, 10000); setInterval(refreshVpn, 20000);
 }());

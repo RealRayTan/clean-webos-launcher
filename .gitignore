@@ -22,3 +22,10 @@ app/apps.js
 
 # Local design explorations and screenshots
 previews/
+
+# Runtime public artwork cache
+app/content-cache/
+
+# Private local movie-data configuration
+tmdb.local.json
+tmdb-token.txt
