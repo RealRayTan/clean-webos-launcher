@@ -26,6 +26,10 @@ python3 tools/configure-tmdb.py --token-file /absolute/private/path/tmdb.json --
 
 4. 在桌面的“设置 → 内容来源”刷新公开内容。服务会重新读取配置；无须重启电视。认证无效时显示错误，保留已有缓存。
 
+## 使用 GitHub Actions Secret
+
+仓库可保存 `TMDB_ACCESS_TOKEN` 和可选的 v3 API Key `TMDB_API_SECRET`。`Source checks` 的手动触发支持一次性公开证书输入；留空时只检查代码，不读取凭据。配置任务先验证 Token，再把美国地区、中文语言的配置加密给该证书，生成保留一天的加密临时产物。私钥必须始终留在接收端，不上传 GitHub。下载解密后仍通过上述 SSH 工具保存到电视；不要把凭据放进前端、日志或 IPK。
+
 ## 加入首页与绑定平台
 
 安装应用后，在“编辑桌面”中勾选。服务只为已安装且已识别的平台查询片单，首页选择不影响平台识别。
