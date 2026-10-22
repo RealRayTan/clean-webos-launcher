@@ -3,12 +3,14 @@ var fs = require('fs');
 var platforms = require('./streaming-platforms.json');
 var API = 'https://api.themoviedb.org/3';
 var TTL = 6 * 3600000;
+var BACKDROP_SIZES = ['w300', 'w780', 'w1280', 'original'];
 var CREDITS = [
   { name: 'TMDB', url: 'https://www.themoviedb.org/' },
   { name: 'JustWatch', url: 'https://www.justwatch.com/' }
 ];
 function failure(code, message) { var error = new Error(message); error.code = code; return error; }
 function normalize(value) { return String(value || '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' '); }
+function clean(value) { return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 180) : ''; }
 function readConfig(file) {
   var saved = {};
   try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -85,6 +87,16 @@ exports.create = function (options) {
       return Number.isSafeInteger(row.id) && row.id > 0 && row.adult !== true && typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today && /^\/[A-Za-z0-9_-]+\.(?:jpg|png)$/.test(row.backdrop_path || '');
     }).map(function (row) { return { type: type, value: row }; });
   }
+  async function catalogArtwork(path) {
+    var sizes = ['original', 'w1280', 'w780'];
+    for (var i = 0; i < sizes.length; i++) {
+      try {
+        return await options.image('https://image.tmdb.org/t/p/' + sizes[i] + path);
+      } catch (error) {}
+    }
+    throw failure('TMDB_IMAGE_UNAVAILABLE', '影视图片暂不可用');
+  }
+
   async function fetchCatalog(key) {
     var settings = readConfig(configPath);
     if (!settings.token) throw failure('TMDB_NOT_CONFIGURED', '尚未配置影视资料源');
@@ -105,13 +117,33 @@ exports.create = function (options) {
       var title = row[entry.type === 'tv' ? 'name' : 'title'] || row[entry.type === 'tv' ? 'original_name' : 'original_title'];
       if (typeof title !== 'string' || !title.trim() || title.length > 400) continue;
       try {
-        var artwork = await options.image('https://image.tmdb.org/t/p/w780' + row.backdrop_path);
-        items.push({ id: id, title: title.trim(), image: artwork, subtitle: platform.label + ' · ' + settings.region + '片库精选', sourceUrl: 'https://www.themoviedb.org/' + entry.type + '/' + row.id, credits: CREDITS });
+        var artwork = await catalogArtwork(row.backdrop_path);
+        items.push({ id: id, title: title.trim(), image: artwork, subtitle: platform.label + ' · ' + settings.region + '片库精选', sourceUrl: 'https://www.themoviedb.org/' + entry.type + '/' + row.id, description: clean(row.overview), credits: CREDITS });
       } catch (error) {}
       if (items.length === 8) break;
     }
     if (!items.length) throw failure('TMDB_NO_CONTENT', '所选地区暂无可用封面');
     return { items: items, sourcePeriod: null, credits: CREDITS, sourceLabel: platform.label + ' · 片库精选', region: settings.region, language: settings.language };
   }
-  return { config: config, platforms: platforms, resolve: resolve, fetch: fetchCatalog };
+  async function backdrop(title, size) {
+    if (typeof title !== 'string' || !title.trim()) return '';
+    var settings;
+    try { settings = readConfig(configPath); } catch (error) { return ''; }
+    if (!settings.token) return '';
+    var chosen = BACKDROP_SIZES.indexOf(size) >= 0 ? size : 'w1280';
+    try {
+      var data = await query('/search/multi', { query: title.trim(), language: settings.language, include_adult: false }, settings);
+      var rows = Array.isArray(data.results) ? data.results : [];
+      var wanted = normalize(title);
+      var match = rows.filter(function (row) {
+        if (row.media_type !== 'tv' && row.media_type !== 'movie') return false;
+        if (typeof row.backdrop_path !== 'string' || !/^\/[A-Za-z0-9_-]+\.(?:jpg|png)$/.test(row.backdrop_path)) return false;
+        return [row.name, row.original_name, row.title, row.original_title].some(function (name) {
+          return typeof name === 'string' && normalize(name) === wanted;
+        });
+      })[0];
+      return match ? 'https://image.tmdb.org/t/p/' + chosen + match.backdrop_path : '';
+    } catch (error) { return ''; }
+  }
+  return { config: config, platforms: platforms, resolve: resolve, fetch: fetchCatalog, backdrop: backdrop };
 };

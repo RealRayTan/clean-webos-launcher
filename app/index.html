@@ -5,35 +5,55 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>我的空间</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="stylesheet" href="live.css">
+  <link rel="stylesheet" href="poster.css">
 </head>
-<body>
+<body data-scheme="hero">
   <main id="scene" class="scene" data-theme="dark" data-wallpaper="valley" aria-label="电视桌面">
-    <header class="header">
-      <div><p class="eyebrow">我的空间</p><h1 id="greeting">晚上好</h1></div>
-      <div class="header-right"><div class="datetime"><time id="clock">18:10</time><p id="date">10月21日，星期三</p></div><div class="header-divider"></div><button id="theme" class="icon-button" data-key="theme" aria-label="切换明暗主题"><img src="assets/sun.svg" alt=""></button><button id="settings" class="icon-button" data-key="settings" aria-label="外观设置"><img src="assets/settings.svg" alt=""></button></div>
-    </header>
+    <div class="cover" aria-hidden="true">
+      <div id="layerA" class="cover-layer is-visible">
+        <img id="bgA" class="cover-bg" alt="">
+        <img id="cardA" class="cover-card" alt="">
+      </div>
+      <div id="layerB" class="cover-layer">
+        <img id="bgB" class="cover-bg" alt="">
+        <img id="cardB" class="cover-card" alt="">
+      </div>
+      <div class="cover-left"></div>
+    </div>
+    <div class="cover-top" aria-hidden="true"></div>
+    <div class="cover-bottom" aria-hidden="true"></div>
 
-    <div class="section-head"><span>我的设备</span><div><span>常用应用</span><button id="edit" class="text-button" data-key="edit"><img src="assets/layout-grid.svg" alt="">编辑桌面</button></div></div>
-
-    <section class="board" aria-label="设备与常用应用">
-      <button id="computer" class="computer tile" data-key="computer" aria-label="电脑，切换到 HDMI 4">
-        <div class="computer-photo"></div><div class="computer-shade"></div>
-        <span class="device-badge"><img src="assets/device-desktop.svg" alt="">常用输入源</span>
-        <div class="computer-label"><span class="device-port">HDMI 4</span><h2>电脑</h2><p>切换到电脑输入源</p></div>
+    <div class="wordmark">我的空间</div>
+    <div class="top-right">
+      <button id="theme" class="theme-toggle" type="button" data-key="theme" aria-label="切换浅色主题">
+        <img class="theme-icon theme-icon-sun" src="assets/sun.svg" alt="">
+        <img class="theme-icon theme-icon-moon" src="assets/moon.svg" alt="">
       </button>
-      <div class="app-shelf"><div id="apps" class="apps" aria-label="常用应用"></div></div>
-    </section>
+      <div class="clock"><b id="clock"></b><span id="date"></span></div>
+    </div>
 
-    <nav class="utilities" aria-label="桌面工具">
-      <button id="all" data-key="all" class="utility"><span class="utility-icon"><img src="assets/layout-grid.svg" alt=""></span><span><strong>全部应用</strong><small>查看与管理</small></span></button>
-      <button id="inputs" data-key="inputs" class="utility"><span class="utility-icon"><img src="assets/plug-connected.svg" alt=""></span><span><strong>输入源</strong><small>HDMI 与直播电视</small></span></button>
-      <button id="network" data-key="network" class="utility"><span class="utility-icon"><img src="assets/shield-lock.svg" alt=""></span><span><strong>网络连接</strong><small id="vpnLabel">打开 Alcyone VPN</small></span></button>
-      <button id="appearance" data-key="appearance" class="utility"><span class="utility-icon"><img src="assets/settings.svg" alt=""></span><span><strong>设置</strong><small>外观与桌面</small></span></button>
-    </nav>
+    <div id="list" class="list" role="listbox" aria-label="应用列表">
+      <div id="track" class="track"></div>
+    </div>
 
+    <button id="menu" class="menu" type="button" data-key="menu" aria-label="打开菜单">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>
+      <span>菜单</span>
+    </button>
 
-    <div id="overlay" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="dialog-head"><div><p id="dialog-kicker" class="eyebrow">我的空间</p><h2 id="dialog-title">全部应用</h2></div><button id="close" class="icon-button" aria-label="关闭"><img src="assets/x.svg" alt=""></button></header><div id="dialog-body"></div></section></div>
+    <div id="menuPanel" class="menu-panel" hidden>
+      <button class="menu-item" type="button" data-action="all">全部应用</button>
+      <button class="menu-item" type="button" data-action="inputs">输入源</button>
+      <button class="menu-item" type="button" data-action="network">网络连接<small id="vpnLabel">打开网络设置</small></button>
+      <button class="menu-item" type="button" data-action="settings">设置</button>
+    </div>
+
+    <div class="caption" aria-live="polite">
+      <b id="captionTitle"></b>
+      <span id="captionText"></span>
+    </div>
+
+    <div id="overlay" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="dialog-head"><div><h2 id="dialog-title">全部应用</h2></div><button id="close" class="icon-button" aria-label="关闭"><img src="assets/x.svg" alt=""></button></header><div id="dialog-body"></div></section></div>
     <div id="toast" role="status"></div>
   </main>
 
@@ -42,8 +62,6 @@
   <script src="device.js"></script>
   <script src="theme.js"></script>
   <script src="content.js"></script>
-  <script src="palette.js"></script>
-  <script src="live.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -58,9 +58,14 @@ async function downloadImage(url) {
   }
   return 'content-cache/' + name;
 }
-async function item(id, title, artwork, subtitle, sourceUrl) {
+function cleanText(value, limit) {
+  if (typeof value !== 'string') return '';
+  var text = xml(value.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ')).replace(/\s+/g, ' ').trim();
+  return text.slice(0, limit || 180);
+}
+async function item(id, title, artwork, subtitle, sourceUrl, description) {
   if (typeof title !== 'string' || !title.trim() || title.length > 400 || !/^https:\/\//.test(sourceUrl)) throw new Error('Invalid content');
-  return { id: String(id), title: title.trim(), image: await image(artwork), subtitle: subtitle, sourceUrl: sourceUrl };
+  return { id: String(id), title: title.trim(), image: await image(artwork), subtitle: subtitle, sourceUrl: sourceUrl, description: cleanText(description, 180) };
 }
 async function collect(rows, transform, count) {
   var output = [];
@@ -70,24 +75,60 @@ async function collect(rows, transform, count) {
 async function bili() {
   var data = await json('https://api.bilibili.com/x/web-interface/popular?ps=8&pn=1');
   if (data.code !== 0) throw new Error('Bilibili unavailable');
-  return { items: await collect(data.data.list, function (v) { return item(v.bvid, v.title, v.pic, '公开热门 · ' + v.owner.name, 'https://www.bilibili.com/video/' + v.bvid); }, 5) };
+  return { items: await collect(data.data.list, function (v) { return item(v.bvid, v.title, v.pic, '公开热门 · ' + v.owner.name, 'https://www.bilibili.com/video/' + v.bvid, v.desc || v.tname); }, 5) };
 }
-function xml(text) { return text.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, function (_, n) { return String.fromCodePoint(Number(n)); }); }
+function xml(text) { return text.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#(\d+);/g, function (_, n) { return String.fromCodePoint(Number(n)); }).replace(/&#x([0-9a-f]+);/gi, function (_, n) { return String.fromCodePoint(parseInt(n, 16)); }); }
 async function youtube() {
   var feed = (await request('https://www.youtube.com/feeds/videos.xml?channel_id=UCLA_DiR1FfKNvjuUpBHmylQ', 1000000)).toString('utf8');
   var rows = feed.match(/<entry>[\s\S]*?<\/entry>/g) || [];
-  return { items: await collect(rows, function (row) {
+  return { items: await collect(rows, async function (row) {
     var id = row.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)[1];
     var title = xml(row.match(/<title>([\s\S]*?)<\/title>/)[1]);
     var artwork = xml(row.match(/<media:thumbnail[^>]+url="([^"]+)"/)[1]);
-    return item(id, title, artwork, 'NASA · 公开频道更新', 'https://www.youtube.com/watch?v=' + id);
+    var summary = row.match(/<media:description[^>]*>([\s\S]*?)<\/media:description>/);
+    var line = summary ? xml(summary[1]).split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean)[0] || '' : '';
+    try {
+      return await item(id, title, 'https://i.ytimg.com/vi/' + id + '/maxresdefault.jpg', 'NASA · 公开频道更新', 'https://www.youtube.com/watch?v=' + id, line);
+    } catch (error) {
+      return item(id, title, artwork, 'NASA · 公开频道更新', 'https://www.youtube.com/watch?v=' + id, line);
+    }
   }, 5) };
 }
 async function apple() {
   var data = (await json('https://www.apple.com/tv-pr/originals.originals.json')).results.originals;
   var today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
   var rows = data.filter(function (v) { return ['series', 'films', 'film'].includes(v.showTypeKey) && v.releaseDateISOString && v.releaseDateISOString.slice(0, 10) <= today && v.image; }).sort(function (a, b) { return b.releaseDateISOString.localeCompare(a.releaseDateISOString); });
-  return { items: await collect(rows.slice(0, 12), function (v) { var i = v.image; return item(v.url, v.title, 'https://www.apple.com' + i.dirpath + i.name + (i.separator || '.') + 'large.' + (i.type || 'jpg'), '官方片单 · ' + v.releaseDateISOString.slice(0, 10), 'https://www.apple.com' + v.url); }, 5) };
+  async function artwork(v) {
+    var i = v.image;
+    var fallback = 'https://www.apple.com' + i.dirpath + i.name + (i.separator || '.') + 'large_2x.' + (i.type || 'jpg');
+    try {
+      var page = (await request('https://www.apple.com' + v.url, 2000000)).toString('utf8');
+      var match = page.match(/\/tv-pr\/shows-and-films\/[^"'\s]+?\.jpg\.video_show_home_large_2x\.jpg/);
+      if (match) return 'https://www.apple.com' + match[0];
+    } catch (error) {}
+    return fallback;
+  }
+  return { items: await collect(rows.slice(0, 12), async function (v) {
+    var text = (v.genres || []).join(' · ');
+    if (v.releaseDateISOString) text += (text ? ' · ' : '') + v.releaseDateISOString.slice(0, 4);
+    var backdrop = '';
+    try { backdrop = tmdb ? await tmdb.backdrop(v.title, 'original') : ''; } catch (error) {}
+    var fallback = await artwork(v);
+    var subtitle = '官方片单 · ' + v.releaseDateISOString.slice(0, 10);
+    var sourceUrl = 'https://www.apple.com' + v.url;
+    var result;
+    if (backdrop) {
+      try {
+        result = await item(v.url, v.title, backdrop, subtitle, sourceUrl, text);
+        result.credits = [{ name: 'TMDB', url: 'https://www.themoviedb.org/' }];
+      } catch (error) {
+        result = await item(v.url, v.title, fallback, subtitle, sourceUrl, text);
+      }
+    } else {
+      result = await item(v.url, v.title, fallback, subtitle, sourceUrl, text);
+    }
+    return result;
+  }, 5) };
 }
 function normalize(title) { return title.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, ''); }
 async function netflix() {
@@ -103,8 +144,24 @@ async function netflix() {
     var choices = owned.length ? owned : matches;
     if (choices.length !== 1) throw new Error('Ambiguous artwork');
     var show = choices[0];
-    var result = await item(show.id, r.show_title, show.image.original, '全球周榜 #' + r.weekly_rank + ' · ' + week, 'https://www.netflix.com/tudum/top10/tv/global');
-    result.credits = [{ name: 'TVmaze', url: show.url }]; return result;
+    var backdrop = '';
+    try { backdrop = tmdb ? await tmdb.backdrop(r.show_title, 'original') : ''; } catch (error) {}
+    var credits = [{ name: 'TVmaze', url: show.url }];
+    var subtitle = '全球周榜 #' + r.weekly_rank + ' · ' + week;
+    var result;
+    if (backdrop) {
+      try {
+        result = await item(show.id, r.show_title, backdrop, subtitle, 'https://www.netflix.com/tudum/top10/tv/global', show.summary);
+        result.credits = credits.concat([{ name: 'TMDB', url: 'https://www.themoviedb.org/' }]);
+      } catch (error) {
+        result = await item(show.id, r.show_title, show.image.original, subtitle, 'https://www.netflix.com/tudum/top10/tv/global', show.summary);
+        result.credits = credits;
+      }
+    } else {
+      result = await item(show.id, r.show_title, show.image.original, subtitle, 'https://www.netflix.com/tudum/top10/tv/global', show.summary);
+      result.credits = credits;
+    }
+    return result;
   }, 5);
   return { items: output, sourcePeriod: week };
 }

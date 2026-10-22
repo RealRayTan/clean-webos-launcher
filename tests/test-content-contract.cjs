@@ -33,6 +33,16 @@ test('a catalog arriving after startup makes a new installed platform available 
   content.setApps([]); requests[1].callback({ returnValue: true, version: 2, providers: {} });
   assert.equal(content.supports('amazon'), false);
 });
+test('optional descriptions are normalized and clamped at the feed boundary', () => {
+  const { content, requests } = client();
+  content.setApps([{ id: 'amazon', title: 'Prime Video' }]); content.start();
+  const data = catalog();
+  data.providers.amazon.items[0].description = '  A   one-line\nsummary.  ';
+  data.providers.amazon.items.push({ ...data.providers.amazon.items[0], id: 'movie:2', description: 'x'.repeat(400) });
+  requests[0].callback(data);
+  assert.equal(content.items('amazon')[0].description, 'A one-line summary.');
+  assert.equal(content.items('amazon')[1].description.length, 180);
+});
 test('unknown apps and unsafe artwork are rejected at the feed boundary', () => {
   const { content, requests } = client();
   content.setApps([{ id: 'amazon', title: 'Prime Video' }]); content.start();

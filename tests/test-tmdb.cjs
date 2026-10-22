@@ -12,14 +12,17 @@ function fixture(t, settings = {}, adjust = () => {}) {
   const calls = [], images = [];
   const handlers = {
     providers: [{ provider_id: 900, provider_name: 'Amazon Prime Video' }, { provider_id: 901, provider_name: 'Amazon Channel' }],
-    movie: [{ id: 1, title: '电影中文名', original_title: 'Film', backdrop_path: '/film.jpg', release_date: '2020-01-01' }],
-    tv: [{ id: 1, name: '', original_name: 'Series Original', backdrop_path: '/series.jpg', first_air_date: '2020-01-01' }]
+    movie: [{ id: 1, title: '电影中文名', original_title: 'Film', backdrop_path: '/film.jpg', release_date: '2020-01-01', overview: '一个电影简介。' }],
+    tv: [{ id: 1, name: '', original_name: 'Series Original', backdrop_path: '/series.jpg', first_air_date: '2020-01-01', overview: 'A series overview.' }],
+    search: [{ media_type: 'tv', name: 'Series Original', original_name: 'Series Original', backdrop_path: '/backdrop.jpg' }]
   };
   adjust(handlers);
   const adapter = create({ configPath, request: async (raw, limit, headers) => {
     const url = new URL(raw); calls.push({ url, limit, headers });
     if (handlers.error) throw handlers.error;
-    const data = url.pathname.includes('/watch/providers/') ? handlers.providers : url.pathname.endsWith('/movie') ? handlers.movie : handlers.tv;
+    const data = url.pathname.includes('/watch/providers/') ? handlers.providers
+      : url.pathname.includes('/search/') ? handlers.search
+      : url.pathname.endsWith('/movie') ? handlers.movie : handlers.tv;
     return Buffer.from(JSON.stringify({ results: data }));
   }, image: async url => { images.push(url); return 'content-cache/' + 'a'.repeat(64) + '.jpg'; } });
   return { adapter, calls, images, configPath };
@@ -28,6 +31,7 @@ test('US subscription catalogs share one adapter, keep film/TV IDs distinct and 
   const { adapter, calls, images } = fixture(t);
   const result = await adapter.fetch('prime');
   assert.deepEqual(result.items.map(x => [x.id, x.title]), [['movie:1', '电影中文名'], ['tv:1', 'Series Original']]);
+  assert.deepEqual(result.items.map(x => x.description), ['一个电影简介。', 'A series overview.']);
   assert.equal(result.region, 'US'); assert.equal(result.language, 'zh-CN');
   assert.match(result.sourceLabel, /片库精选/); assert.doesNotMatch(result.sourceLabel, /热门榜|上新/);
   const discover = calls.filter(c => c.url.pathname.includes('/discover/'));
@@ -40,10 +44,27 @@ test('US subscription catalogs share one adapter, keep film/TV IDs distinct and 
     assert.equal(call.url.searchParams.get('with_watch_monetization_types'), 'flatrate');
     assert.equal(call.url.searchParams.get('with_watch_providers'), '900');
   }
-  assert.deepEqual(images, ['https://image.tmdb.org/t/p/w780/film.jpg', 'https://image.tmdb.org/t/p/w780/series.jpg']);
+  assert.deepEqual(images, ['https://image.tmdb.org/t/p/original/film.jpg', 'https://image.tmdb.org/t/p/original/series.jpg']);
   assert.deepEqual(result.credits.map(x => x.name), ['TMDB', 'JustWatch']);
   assert.deepEqual(adapter.config(), { region: 'US', language: 'zh-CN', configured: true });
   assert.ok(!JSON.stringify(result).includes('fixture-only-token'));
+});
+test('overview descriptions are clamped at the source boundary', async t => {
+  const { adapter } = fixture(t, {}, h => { h.movie[0].overview = 'x'.repeat(400); });
+  const result = await adapter.fetch('prime');
+  assert.equal(result.items[0].description.length, 180);
+});
+test('backdrops are matched by exact title and skip unmatched results', async t => {
+  const { adapter } = fixture(t);
+  assert.equal(await adapter.backdrop('Series Original'), 'https://image.tmdb.org/t/p/w1280/backdrop.jpg');
+  assert.equal(await adapter.backdrop('Series Original', 'original'), 'https://image.tmdb.org/t/p/original/backdrop.jpg');
+  assert.equal(await adapter.backdrop('Series Original', 'w999'), 'https://image.tmdb.org/t/p/w1280/backdrop.jpg');
+  assert.equal(await adapter.backdrop('Series Original Deluxe'), '');
+});
+test('backdrops do not request without credentials', async t => {
+  const { adapter, calls } = fixture(t, { token: '' });
+  assert.equal(await adapter.backdrop('Series Original'), '');
+  assert.equal(calls.length, 0);
 });
 test('missing credentials return actionable failure without network requests', async t => {
   const { adapter, calls } = fixture(t, { token: '' });
