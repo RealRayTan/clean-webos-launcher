@@ -43,6 +43,7 @@ service.register('status', function (message) {
 });
 service.register('open', function (message) { launch('requested'); message.respond({ returnValue: true }); });
 require('./app-catalog').register(service);
+try { require('./public-content').register(service); } catch (error) { log('content unavailable: ' + error.message); }
 
 // Read events without grabbing them: every native button remains available.
 // HOME release opens our app; a hold leaves LG's original Home available.

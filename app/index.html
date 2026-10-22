@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>我的空间</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="live.css">
 </head>
 <body>
   <main id="scene" class="scene" data-theme="dark" data-wallpaper="valley" aria-label="电视桌面">
@@ -21,7 +22,7 @@
         <span class="device-badge"><img src="assets/device-desktop.svg" alt="">常用输入源</span>
         <div class="computer-label"><span class="device-port">HDMI 4</span><h2>电脑</h2><p>切换到电脑输入源</p></div>
       </button>
-      <div id="apps" class="apps" aria-label="常用应用"></div>
+      <div class="app-shelf"><div id="apps" class="apps" aria-label="常用应用"></div></div>
     </section>
 
     <nav class="utilities" aria-label="桌面工具">
@@ -32,14 +33,17 @@
     </nav>
 
 
-    <div id="overlay" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="dialog-head"><div><p id="dialog-kicker" class="eyebrow">我的空间</p><h2 id="dialog-title">全部应用</h2></div><button id="close" class="icon-button" aria-label="关闭"><img src="assets/x.svg" alt=""></button></header><div id="dialog-body"></div><p class="dialog-foot">方向键选择 · 确认键操作 · 返回键关闭</p></section></div>
+    <div id="overlay" class="overlay" hidden><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title"><header class="dialog-head"><div><p id="dialog-kicker" class="eyebrow">我的空间</p><h2 id="dialog-title">全部应用</h2></div><button id="close" class="icon-button" aria-label="关闭"><img src="assets/x.svg" alt=""></button></header><div id="dialog-body"></div></section></div>
     <div id="toast" role="status"></div>
   </main>
-  <aside class="preview-note">浏览器预览 · 设备操作需在电视上使用<span>方向键 / Enter / Esc，也可用鼠标操作</span></aside>
+
   <script src="config.js"></script>
   <script src="apps.js"></script>
   <script src="device.js"></script>
   <script src="theme.js"></script>
+  <script src="content.js"></script>
+  <script src="palette.js"></script>
+  <script src="live.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

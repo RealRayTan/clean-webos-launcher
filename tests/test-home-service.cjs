@@ -23,7 +23,7 @@ function scenario() {
     };
   }
   vm.runInNewContext(source, {
-    require: name => name === 'fs' ? storage : name === './app-catalog' ? { register() {} } : name === './return-origin' ? { start: () => ({ cancel() {}, status: () => ({}) }) } : name === './resume-state' ? { start: () => () => ({}) } : name === './native-home' ? { start: handler => { nativeKey = handler; } } : Service,
+    require: name => name === 'fs' ? storage : (name === './app-catalog' || name === './public-content') ? { register() {} } : name === './return-origin' ? { start: () => ({ cancel() {}, status: () => ({}) }) } : name === './resume-state' ? { start: () => () => ({}) } : name === './native-home' ? { start: handler => { nativeKey = handler; } } : Service,
     process: { argv: ['node', 'service.js', '--boot'], arch: 'arm', pid: 42, getuid: () => 0 }, Buffer, Date: FakeDate,
     setInterval: (fn, ms) => intervals.push({ fn, ms }),
     setTimeout: (fn, ms) => { const task = { fn, ms }; pending.push(task); return task; },
