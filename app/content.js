@@ -20,6 +20,7 @@
           /^content-cache\/[a-f0-9]{64}\.jpg$/.test(item.image) && /^https:\/\//.test(item.sourceUrl);
       }).slice(0, 8).map(function (item) {
         return { id: item.id, title: item.title, image: item.image, subtitle: item.subtitle || '',
+          description: typeof item.description === 'string' ? item.description.replace(/\s+/g, ' ').trim().slice(0, 180) : '',
           sourceUrl: item.sourceUrl, sourceActionLabel: source.sourceActionLabel || '查看内容来源', providerLabel: source.label, fetchedAt: source.fetchedAt,
           sourcePeriod: source.sourcePeriod, credits: item.credits || source.credits || [], publishedAt: item.publishedAt };
       });

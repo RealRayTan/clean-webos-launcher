@@ -1,8 +1,13 @@
-/* Local webOS launcher. Device actions use the bounded adapter in device.js. */
+/* Local webOS launcher. D13 poster home plus the existing settings and dialogs. */
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var scene = $('scene'), overlay = $('overlay'), panel = overlay.querySelector('.dialog'), body = $('dialog-body');
+  var track = $('track'), menuEl = $('menu'), panelEl = $('menuPanel');
+  var panelButtons = Array.prototype.slice.call(panelEl.querySelectorAll('.menu-item'));
+  var layers = [$('layerA'), $('layerB')], backgrounds = [$('bgA'), $('bgB')], cards = [$('cardA'), $('cardB')];
+  var clockEl = $('clock'), dateEl = $('date'), captionTitle = $('captionTitle'), captionText = $('captionText');
+  var focusLine = null;
   var KEY = 'tvhome.tiles.v1';
   var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
   var vpnId = 'com.alcyone.vpn.singbox';
@@ -16,6 +21,13 @@
     amazon: { name: 'Prime Video', style: 'prime' },
     'com.alcyone.vpn.singbox': { name: 'Alcyone', subtitle: 'VPN', style: 'alcyone' },
     'org.webosbrew.hbchannel': { name: 'Homebrew', subtitle: 'Channel', style: 'homebrew' }
+  };
+  var contentHints = {
+    'com.biliwebos.app': '正在读取公开热门',
+    'youtube.leanback.v4': '正在读取 NASA 频道',
+    netflix: '正在读取 Netflix 周榜',
+    'com.apple.appletv': '正在读取 Apple TV 片单',
+    amazon: '正在读取 Prime Video 片单'
   };
   function sanitizeApps(value) {
     if (!Array.isArray(value)) return [];
@@ -41,13 +53,18 @@
       else state.apps = defaults.filter(function (id) { return hidden.indexOf(id) < 0; });
     }
   } catch (error) {}
-  var dialogType = '', returnKey = 'computer', loadingApps = false, lastLaunch = 0, toastTimer, idleTimer;
-  var okDown = false, okTarget = null, okTimer = null, orderDraft = null, movingId = null;
+  var items = [], index = 0, zone = 'list', menuIndex = 0, offset = 0;
+  var frontIndex = 0, frontImage = '', coverKey = '', pending = null, fadeTimer = 0, requestId = 0;
+  var preloads = {}, COVER_FADE_MS = 600;
+  var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
+  var dialogType = '', returnZone = 'list', loadingApps = false, lastLaunch = 0, toastTimer;
+  var okDown = false, okTarget = null, orderDraft = null, movingId = null;
   var vpnRequest = 0;
-  function homeIds() { return state.apps.filter(function (id) { return !!installed(id); }); }
   document.body.classList.toggle('on-tv', TVDevice.available);
+
+  function homeIds() { return state.apps.filter(function (id) { return !!installed(id); }); }
   function icon(file) { var img = document.createElement('img'); img.src = 'assets/' + file; img.alt = ''; return img; }
-  function toast(text) { $('toast').textContent = text; $('toast').classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { $('toast').classList.remove('visible'); }, 2400); }
+  function toast(text) { var el = $('toast'); el.textContent = text; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('visible'); }, 2400); }
   function commit(changes) {
     var next = { theme: state.theme, wallpaper: state.wallpaper, apps: state.apps.slice(), lastFocus: state.lastFocus };
     Object.keys(changes).forEach(function (key) { next[key] = changes[key]; });
@@ -71,39 +88,222 @@
   function appearance() {
     var effective = FrameTheme.resolve(state.theme, new Date().getHours());
     scene.dataset.theme = effective; scene.dataset.wallpaper = state.wallpaper;
-    $('theme').firstElementChild.src = effective === 'dark' ? 'assets/sun.svg' : 'assets/moon.svg';
     $('theme').setAttribute('aria-label', (effective === 'dark' ? '切换浅色主题' : '切换深色主题') + (state.theme === 'auto' ? '，当前按时间自动切换' : ''));
   }
   function clock() {
     var now = new Date(), h = now.getHours();
-    $('clock').textContent = ('0' + h).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
-    $('date').textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日，星期' + '日一二三四五六'.charAt(now.getDay());
-    $('greeting').textContent = h < 5 ? '夜深了' : h < 12 ? '早上好' : h < 18 ? '下午好' : '晚上好';
+    clockEl.textContent = ('0' + h).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    dateEl.textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日，星期' + '日一二三四五六'.charAt(now.getDay());
     appearance();
   }
-  function resetIdle() {
-    scene.dataset.idle = 'false'; clearTimeout(idleTimer);
-    idleTimer = setTimeout(function () { scene.dataset.idle = 'true'; }, 180000);
+
+  function wallpaperSrc() { return state.wallpaper === 'peaks' ? 'assets/peaks.jpg' : 'assets/valley.jpg'; }
+  function homeItems() {
+    var list = [{ id: computer, name: '电脑', meta: 'HDMI 4', icon: 'device-desktop.svg', style: 'computer', desc: '切换到电脑输入源', fallback: wallpaperSrc() }];
+    homeIds().forEach(function (id) {
+      var info = appInfo(id);
+      list.push({ id: id, name: info.name, meta: info.subtitle, icon: info.icon, installedIcon: info.installedIcon, style: info.style, subtitle: info.subtitle, desc: '打开应用', fallback: wallpaperSrc() });
+    });
+    return list;
   }
+  function renderList(preferredId) {
+    PublicContent.setApps(catalog);
+    var wanted = preferredId || (items[index] && items[index].id) || state.lastFocus || computer;
+    items = homeItems();
+    var next = 0, found = false;
+    items.forEach(function (item, i) { if (item.id === wanted) { next = i; found = true; } });
+    index = found ? next : 0;
+    track.innerHTML = '';
+    items.forEach(function (app, i) {
+      var row = document.createElement('button');
+      row.type = 'button'; row.className = 'row'; row.dataset.index = String(i); row.setAttribute('role', 'option');
+      row.setAttribute('aria-label', (app.id === computer ? '电脑，切换到 HDMI 4' : '打开 ' + app.name));
+      if (app.icon) {
+        var iconBox = document.createElement('span');
+        iconBox.className = 'icon' + (app.style && ['bili', 'youtube', 'netflix'].indexOf(app.style) >= 0 ? ' icon--' + app.style : '');
+        var image = document.createElement('img'); image.src = 'assets/' + app.icon; image.alt = ''; iconBox.appendChild(image); row.appendChild(iconBox);
+      } else if (app.installedIcon) {
+        var installedBox = document.createElement('span'); installedBox.className = 'icon installed';
+        var installedImage = document.createElement('img'); installedImage.src = app.installedIcon; installedImage.alt = ''; installedBox.appendChild(installedImage); row.appendChild(installedBox);
+      } else {
+        var mark = document.createElement('span'); mark.className = 'mark';
+        mark.textContent = app.style === 'prime' ? 'P' : app.name.charAt(0); row.appendChild(mark);
+      }
+      var name = document.createElement('span'); name.className = 'name'; name.textContent = app.name; row.appendChild(name);
+      if (app.meta) { var meta = document.createElement('span'); meta.className = 'meta'; meta.textContent = app.meta; row.appendChild(meta); }
+      row.addEventListener('click', function () { if (index === i) launch(items[i].id); else setIndex(i); });
+      track.appendChild(row);
+    });
+    focusLine = document.createElement('div'); focusLine.className = 'focus-line'; focusLine.setAttribute('aria-hidden', 'true'); track.appendChild(focusLine);
+    updateList(); updateCover(); updateZones();
+  }
+  function rows() { return Array.prototype.slice.call(track.querySelectorAll('.row')); }
+  function setIndex(next) {
+    index = Math.max(0, Math.min(items.length - 1, next));
+    zone = 'list';
+    updateList(); updateCover(); updateZones();
+  }
+  function updateList() {
+    offset = Math.max(0, Math.min(index - 3, items.length - 6));
+    track.style.transform = 'translateY(' + (-offset * 100) + 'px)';
+    if (focusLine) focusLine.style.transform = 'translateY(' + (index * 100) + 'px)';
+    rows().forEach(function (row, i) {
+      row.classList.toggle('focus', i === index);
+      row.setAttribute('aria-selected', String(i === index));
+    });
+  }
+  function updateZones() {
+    var inMenu = zone === 'menu' || zone === 'panel';
+    menuEl.classList.toggle('focus', inMenu);
+    panelEl.hidden = zone !== 'panel';
+    panelButtons.forEach(function (button, i) { button.classList.toggle('focus', zone === 'panel' && i === menuIndex); });
+  }
+  function openPanel() { zone = 'panel'; menuIndex = 0; updateZones(); }
+  function closePanel() { zone = 'menu'; updateZones(); }
+  function act(action) {
+    zone = 'menu'; updateZones();
+    if (action === 'all') { openDialog('all'); refreshApps(false); }
+    else if (action === 'inputs') openDialog('inputs');
+    else if (action === 'settings') openDialog('settings');
+    else if (action === 'network') {
+      if (installed(vpnId)) launch(vpnId); else launch('com.palm.app.settings', { target: 'network' });
+      zone = 'list'; updateZones();
+    }
+  }
+
+  function contentFor(app) {
+    var list = window.PublicContent ? PublicContent.items(app.id) : [];
+    return list && list.length ? list[0] : null;
+  }
+  function coverState() {
+    var app = items[index] || { id: computer, name: '电脑', meta: 'HDMI 4', fallback: wallpaperSrc(), desc: '切换到电脑输入源' };
+    var item = contentFor(app);
+    var src = item && item.image ? item.image : (app.fallback || wallpaperSrc());
+    var title = item ? item.title : app.name + (app.meta ? ' · ' + app.meta : '');
+    var text;
+    if (item) text = item.description || item.subtitle || '';
+    else if (app.id === computer) text = '切换到电脑输入源';
+    else text = contentHints[app.id] || app.subtitle || '打开应用';
+    return { app: app, item: item, src: src, title: title, text: text };
+  }
+  function setCaption(title, text) {
+    if (captionTitle.textContent === title && captionText.textContent === text) return;
+    captionTitle.textContent = title; captionText.textContent = text;
+  }
+  function preloadCovers() {
+    items.forEach(function (app) {
+      var item = contentFor(app);
+      if (!item || preloads[item.image]) return;
+      preloads[item.image] = true;
+      var image = new Image(); image.src = item.image;
+      if (image.decode) image.decode().catch(function () {});
+    });
+    [wallpaperSrc(), 'assets/valley.jpg', 'assets/peaks.jpg'].forEach(function (src) {
+      if (preloads[src]) return;
+      preloads[src] = true;
+      var image = new Image(); image.src = src;
+      if (image.decode) image.decode().catch(function () {});
+    });
+  }
+  function updateCover() {
+    preloadCovers();
+    var next = coverState();
+    var key = next.app.id + '|' + next.src + '|' + next.title + '|' + next.text;
+    if (key === coverKey) return;
+    coverKey = key;
+    goTo(next);
+  }
+  function finishFade() {
+    if (!pending) return;
+    clearTimeout(fadeTimer); fadeTimer = 0;
+    var incoming = layers[pending.index], outgoing = layers[frontIndex];
+    incoming.style.transition = 'none'; incoming.style.opacity = '1';
+    outgoing.style.transition = 'none'; outgoing.style.opacity = '0';
+    outgoing.classList.remove('is-visible');
+    void incoming.offsetWidth;
+    incoming.style.transition = ''; outgoing.style.transition = '';
+    incoming.style.opacity = ''; outgoing.style.opacity = '';
+    frontIndex = pending.index; frontImage = pending.image; pending = null;
+  }
+  function markMedia(layer, card) {
+    var portrait = card.naturalHeight > card.naturalWidth;
+    layer.classList.toggle('is-portrait', portrait);
+    layer.classList.toggle('is-landscape', !portrait);
+    document.body.dataset.media = portrait ? 'portrait' : 'landscape';
+    card.style.setProperty('--media-aspect', card.naturalWidth + ' / ' + card.naturalHeight);
+  }
+  function loadMedia(layerIndex, cover, id, done) {
+    var bg = backgrounds[layerIndex], card = cards[layerIndex], left = 2, failed = false, finished = false;
+    function finish() { if (finished || id !== requestId) return; finished = true; done(card); }
+    function settle() { if (failed || id !== requestId) return; if (--left > 0) return; finish(); }
+    function fail() {
+      if (failed || id !== requestId) return;
+      failed = true;
+      var fallback = cover.app.fallback || 'assets/valley.jpg';
+      bg.onerror = null; card.onerror = null;
+      if (bg.src.indexOf(fallback) >= 0 && card.src.indexOf(fallback) >= 0) {
+        if (bg.complete && bg.naturalWidth && card.complete && card.naturalWidth) finish();
+        return;
+      }
+      bg.src = fallback; card.src = fallback;
+      function check() { if (id !== requestId) return; if (bg.complete && bg.naturalWidth && card.complete && card.naturalWidth) finish(); }
+      bg.onload = check; card.onload = check; check();
+    }
+    bg.onload = settle; card.onload = settle; bg.onerror = fail; card.onerror = fail;
+    bg.src = cover.src; card.src = cover.src;
+    if (bg.complete && bg.naturalWidth) settle();
+    if (card.complete && card.naturalWidth) settle();
+  }
+  function startFade(cover) {
+    setCaption(cover.title, cover.text);
+    var id = ++requestId, incomingIndex = 1 - frontIndex, incoming = layers[incomingIndex];
+    loadMedia(incomingIndex, cover, id, function (card) {
+      if (id !== requestId) return;
+      markMedia(incoming, card);
+      incoming.style.transition = 'none'; incoming.style.opacity = '0';
+      incoming.classList.remove('is-visible'); incoming.style.zIndex = '2';
+      layers[frontIndex].style.zIndex = '1';
+      void incoming.offsetWidth;
+      incoming.style.transition = ''; incoming.style.opacity = '';
+      pending = { index: incomingIndex, image: cover.src, state: cover };
+      incoming.classList.add('is-visible');
+      fadeTimer = setTimeout(finishFade, motionQuery && motionQuery.matches ? 0 : COVER_FADE_MS + 40);
+    });
+  }
+  function retargetFade(cover) {
+    var incomingIndex = pending.index, incoming = layers[incomingIndex];
+    setCaption(cover.title, cover.text);
+    pending.image = cover.src; pending.state = cover;
+    var id = ++requestId;
+    loadMedia(incomingIndex, cover, id, function (card) { if (id !== requestId) return; markMedia(incoming, card); });
+  }
+  function goTo(cover) {
+    if (pending) {
+      if (cover.src === pending.image) { setCaption(cover.title, cover.text); return; }
+      if (cover.src === frontImage) {
+        clearTimeout(fadeTimer); fadeTimer = 0;
+        layers[pending.index].classList.remove('is-visible');
+        pending = null; ++requestId;
+        document.body.dataset.media = layers[frontIndex].classList.contains('is-portrait') ? 'portrait' : 'landscape';
+        setCaption(cover.title, cover.text); return;
+      }
+      retargetFade(cover); return;
+    }
+    if (cover.src === frontImage) {
+      ++requestId;
+      document.body.dataset.media = layers[frontIndex].classList.contains('is-portrait') ? 'portrait' : 'landscape';
+      setCaption(cover.title, cover.text); return;
+    }
+    startFade(cover);
+  }
+
   function focusables() {
-    return Array.prototype.slice.call((overlay.hidden ? scene : overlay).querySelectorAll('button:not([disabled])')).filter(function (el) { return el.getClientRects().length && (overlay.hidden ? !overlay.contains(el) : true); });
+    if (overlay.hidden) return [];
+    return Array.prototype.slice.call(overlay.querySelectorAll('button:not([disabled])')).filter(function (el) { return el.getClientRects().length; });
   }
   function focusKey(key) {
-    var target = focusables().filter(function (el) { return el.dataset.key === key; })[0] || (overlay.hidden ? $('computer') : body.querySelector('button')) || $('close');
-    target.focus({ preventScroll: true });
-  }
-  function revealApp(target) {
-    var shelf = $('apps');
-    if (!overlay.hidden || !shelf.contains(target)) return;
-    var left = shelf.scrollLeft, inset = 10;
-    if (target.offsetLeft < left + inset) left = target.offsetLeft - inset;
-    else if (target.offsetLeft + target.offsetWidth > left + shelf.clientWidth - inset) left = target.offsetLeft + target.offsetWidth - shelf.clientWidth + inset;
-    shelf.scrollTo({ left: left, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  }
-  function updateShelfEdges() {
-    var shelf = $('apps'), frame = shelf.parentElement;
-    frame.dataset.moreBefore = String(shelf.scrollLeft > 2);
-    frame.dataset.moreAfter = String(shelf.scrollLeft + shelf.clientWidth < shelf.scrollWidth - 2);
+    var target = focusables().filter(function (el) { return el.dataset.key === key; })[0] || body.querySelector('button') || $('close');
+    if (target) target.focus({ preventScroll: true });
   }
   function keepPanelFocusVisible(target) {
     if (overlay.hidden || !body.contains(target)) return;
@@ -111,40 +311,24 @@
     if (a.top < b.top + 20 * scale) body.scrollTop += (a.top - b.top) / scale - 20;
     else if (a.bottom > b.bottom - 20 * scale) body.scrollTop += (a.bottom - b.bottom) / scale + 20;
   }
-  function renderApps() {
-    PublicContent.setApps(catalog);
-    var ids = homeIds();
-    var scroll = $('apps').scrollLeft;
-    $('apps').innerHTML = '';
-    ids.forEach(function (id, index) {
-      var app = appInfo(id), button = document.createElement('button');
-      button.className = 'tile app-tile app-' + app.style; button.dataset.key = id;
-      button.setAttribute('aria-label', '打开 ' + app.name);
-      var column = index < 6 ? index % 3 : 3 + Math.floor((index - 6) / 2);
-      var row = index < 6 ? Math.floor(index / 3) : (index - 6) % 2;
-      button.dataset.column = column; button.dataset.row = row;
-      button.style.gridColumn = String(column + 1); button.style.gridRow = String(row + 1);
-      if (app.icon || app.installedIcon) {
-        var image = app.icon ? icon(app.icon) : document.createElement('img');
-        image.className = 'brand' + (app.icon ? '' : ' installed-icon'); image.alt = '';
-        if (!app.icon) image.src = app.installedIcon;
-        button.appendChild(image);
-      } else { var mark = document.createElement('span'); mark.className = app.style === 'prime' ? 'prime-wordmark' : 'generic-mark'; mark.textContent = app.style === 'prime' ? 'prime video' : app.name.charAt(0); button.appendChild(mark); }
-      var copy = document.createElement('span'); copy.className = 'app-copy';
-      var title = document.createElement('strong'); title.textContent = app.name; copy.appendChild(title);
-      if (app.subtitle) { var small = document.createElement('small'); small.textContent = app.subtitle; copy.appendChild(small); }
-      button.appendChild(copy);
-      TilePalette.apply(button, id, app.icon ? 'assets/' + app.icon : app.installedIcon, installed(id).iconColor);
-      TileMotion.attach(button, id); button.onclick = function () { if (!showContent(id)) launch(id); }; $('apps').appendChild(button);
+  function moveFocus(key) {
+    var elements = focusables(), current = document.activeElement;
+    if (elements.indexOf(current) < 0) { focusKey(); return; }
+    var a = current.getBoundingClientRect(), ax = (a.left + a.right) / 2, ay = (a.top + a.bottom) / 2, best, score = Infinity;
+    elements.forEach(function (el) {
+      if (el === current) return;
+      var b = el.getBoundingClientRect(), dx = (b.left + b.right) / 2 - ax, dy = (b.top + b.bottom) / 2 - ay;
+      var horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
+      var ahead = key === 'ArrowRight' ? dx : key === 'ArrowLeft' ? -dx : key === 'ArrowDown' ? dy : -dy;
+      if (ahead <= 2) return;
+      var overlap = horizontal ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
+      var gap = key === 'ArrowRight' ? b.left - a.right : key === 'ArrowLeft' ? a.left - b.right : key === 'ArrowDown' ? b.top - a.bottom : a.top - b.bottom;
+      var value = Math.max(0, gap) + Math.abs(horizontal ? dy : dx) * 1.4 + (overlap > 0 ? 0 : 500);
+      if (!best || value < score - 1) { score = value; best = el; }
     });
-    if (!ids.length) {
-      var empty = document.createElement('button'); empty.className = 'tile app-tile empty-add'; empty.dataset.key = 'add'; empty.appendChild(icon('plus.svg'));
-      var label = document.createElement('strong'); label.textContent = '添加常用应用'; empty.appendChild(label); empty.onclick = function () { openDialog('manage'); }; $('apps').appendChild(empty);
-    }
-    $('apps').scrollLeft = scroll;
-    updateShelfEdges();
-    $('all').querySelector('small').textContent = catalog.length + ' 个应用';
+    if (best) { best.focus({ preventScroll: true }); keepPanelFocusVisible(best); }
   }
+  function resetKeys() { okDown = false; okTarget = null; }
   function refreshApps(notify) {
     if (!TVDevice.available) { if (notify) toast('浏览器使用本地应用快照，请在电视上刷新'); return; }
     if (loadingApps) return;
@@ -153,14 +337,14 @@
       loadingApps = false;
       var next = result.returnValue && sanitizeApps(result.apps);
       if (!next || !next.length) { if (notify) toast('刷新失败，保留原有列表'); return; }
-      var key = document.activeElement && document.activeElement.dataset.key;
+      var key = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key;
+      var selected = items[index] && items[index].id;
       var changed = JSON.stringify(next) !== JSON.stringify(catalog);
       catalog = next;
       try { localStorage.setItem('tvhome.catalog', JSON.stringify(catalog)); } catch (error) {}
       if (changed && !document.hidden) {
-        renderApps();
+        renderList(selected || key || state.lastFocus);
         if (dialogType === 'all' || dialogType === 'manage') openDialog(dialogType, key);
-        else if (overlay.hidden) focusKey(key || state.lastFocus);
       }
       refreshVpn();
       if (notify) toast('已刷新应用列表');
@@ -168,53 +352,39 @@
   }
   function refreshVpn() {
     if (document.hidden) return;
-    if (!installed(vpnId)) { $('vpnLabel').textContent = '打开网络设置'; return; }
-    if (!TVDevice.available) { $('vpnLabel').textContent = 'Alcyone VPN'; return; }
+    var label = $('vpnLabel'); if (!label) return;
+    if (!installed(vpnId)) { label.textContent = '打开网络设置'; return; }
+    if (!TVDevice.available) { label.textContent = 'Alcyone VPN'; return; }
     var request = ++vpnRequest;
     TVDevice.vpnStatus(function (result) {
       if (request !== vpnRequest || document.hidden) return;
-      $('vpnLabel').textContent = !result.returnValue ? 'VPN 状态暂不可用' : result.connected ? 'VPN 已连接' : 'VPN 未连接';
+      label.textContent = !result.returnValue ? 'VPN 状态暂不可用' : result.connected ? 'VPN 已连接' : 'VPN 未连接';
     });
   }
   function launch(id, params) {
     if (Date.now() - lastLaunch < 800) return;
     lastLaunch = Date.now();
-    var key = document.activeElement && document.activeElement.dataset.key;
     TVDevice.launch(id, params, function (result) {
       if (!result.returnValue) { toast(result.errorText || '无法打开此应用'); return; }
-      if (key && overlay.hidden) commit({ lastFocus: key });
+      if (overlay.hidden && (id === computer || state.apps.indexOf(id) >= 0)) commit({ lastFocus: id });
     });
   }
-  function closeDialog() { if (dialogType === 'sources') { openDialog('settings', 'sources'); return; } overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; focusKey(returnKey); }
+  function closeDialog() {
+    if (dialogType === 'sources') { openDialog('settings', 'sources'); return; }
+    overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; resetKeys();
+    zone = returnZone || 'list'; updateZones();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  }
   function openDialog(type, key) {
-    if (overlay.hidden) returnKey = document.activeElement && document.activeElement.dataset.key || 'computer';
+    if (overlay.hidden) returnZone = zone;
     overlay.hidden = false; dialogType = type; body.innerHTML = ''; body.scrollTop = 0; panel.dataset.view = type;
-    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', content: '内容详情' }[type];
-    $('dialog-kicker').textContent = '我的空间';
-
+    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源' }[type];
     if (type === 'all' || type === 'manage') renderCatalog(type === 'manage');
     if (type === 'settings') renderSettings();
     if (type === 'sources') PublicContent.settings(body);
     if (type === 'inputs') renderInputs();
     if (type === 'order') renderOrder();
     focusKey(key || (body.querySelector('button') && body.querySelector('button').dataset.key));
-  }
-  function showContent(id) {
-    var item = TileMotion.selected(id);
-    if (!item) return false;
-    openDialog('content');
-    $('dialog-kicker').textContent = item.providerLabel;
-    var detail = document.createElement('div'); detail.className = 'content-detail';
-    var image = document.createElement('img'); image.src = item.image; image.alt = ''; detail.appendChild(image);
-    var copy = document.createElement('div');
-    var title = document.createElement('h3'); title.textContent = item.title; copy.appendChild(title);
-    var info = document.createElement('p'); info.textContent = item.subtitle; copy.appendChild(info);
-    detail.appendChild(copy); body.appendChild(detail);
-    var label = item.sourceActionLabel;
-    body.appendChild(button('打开应用', 'choice', 'content-open-app', function () { launch(id); }));
-    body.appendChild(button(label, 'choice content-credit', 'content-source', function () { launch('com.webos.app.browser', { target: item.sourceUrl }); }));
-    focusKey('content-source');
-    return true;
   }
   function paragraph(text) { var p = document.createElement('p'); p.className = 'panel-description'; p.textContent = text; body.appendChild(p); }
   function button(text, className, key, action) {
@@ -233,8 +403,11 @@
       var app = appInfo(raw.id), selected = state.apps.indexOf(app.id) >= 0;
       var row = document.createElement('button'); row.className = 'list-item'; row.dataset.key = 'list-' + app.id;
       var mark = document.createElement('span'); mark.className = 'mark';
-      if (app.icon || app.installedIcon) { var image = app.icon ? icon(app.icon) : document.createElement('img'); if (!app.icon) { image.src = app.installedIcon; image.alt = ''; image.style.filter = 'none'; } mark.appendChild(image); }
-      else mark.textContent = app.name.charAt(0);
+      if (app.icon || app.installedIcon) {
+        var image = app.icon ? icon(app.icon) : document.createElement('img');
+        if (!app.icon) { image.src = app.installedIcon; image.alt = ''; image.style.filter = 'none'; }
+        mark.appendChild(image);
+      } else mark.textContent = app.name.charAt(0);
       row.appendChild(mark);
       var name = document.createElement('span'); name.textContent = raw.title; row.appendChild(name);
       if (manage) {
@@ -243,10 +416,10 @@
       } else if (selected) { var tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '在首页'; row.appendChild(tag); }
       row.onclick = function () {
         if (!manage) return launch(app.id);
-        var ids = state.apps.slice(), index = ids.indexOf(app.id);
-        if (index < 0) ids.push(app.id); else ids.splice(index, 1);
+        var ids = state.apps.slice(), at = ids.indexOf(app.id);
+        if (at < 0) ids.push(app.id); else ids.splice(at, 1);
         if (!commit({ apps: ids })) return;
-        renderApps(); openDialog('manage', row.dataset.key);
+        renderList(app.id); openDialog('manage', row.dataset.key);
       };
       list.appendChild(row);
     });
@@ -254,13 +427,13 @@
   function renderOrder() {
     paragraph(movingId ? '正在移动：' + appInfo(movingId).name + '。上下调整位置，确认保存，返回取消。' : '选中应用按确认开始移动，再按确认保存。');
     var list = document.createElement('div'); list.className = 'order-list'; body.appendChild(list);
-    (orderDraft || state.apps).forEach(function (id, index) {
+    (orderDraft || state.apps).forEach(function (id, i) {
       var row = button('', 'list-item order-item' + (movingId === id ? ' moving' : ''), 'order-' + id, function () {
         if (movingId) {
-          if (commit({ apps: orderDraft.slice() })) { orderDraft = null; movingId = null; renderApps(); openDialog('order', 'order-' + id); }
+          if (commit({ apps: orderDraft.slice() })) { orderDraft = null; movingId = null; renderList(); openDialog('order', 'order-' + id); }
         } else { orderDraft = state.apps.slice(); movingId = id; openDialog('order', 'order-' + id); }
       });
-      var number = document.createElement('span'); number.className = 'order-number'; number.textContent = ('0' + (index + 1)).slice(-2); row.appendChild(number);
+      var number = document.createElement('span'); number.className = 'order-number'; number.textContent = ('0' + (i + 1)).slice(-2); row.appendChild(number);
       var label = document.createElement('span'); label.className = 'order-label'; label.textContent = appInfo(id).name; row.appendChild(label); row.appendChild(icon('grip-vertical.svg')); list.appendChild(row);
     });
     if (!state.apps.length) paragraph('先在“编辑桌面”中添加应用。');
@@ -271,24 +444,45 @@
     orderDraft.splice(to, 0, orderDraft.splice(from, 1)[0]); openDialog('order', 'order-' + movingId);
   }
   function renderSettings() {
-    function choices(title, key, values) {
+    var layout = document.createElement('div'); layout.className = 'settings-layout'; body.appendChild(layout);
+    function section(title) {
+      var node = document.createElement('section'); node.className = 'settings-section';
+      var heading = document.createElement('h3'); heading.textContent = title; node.appendChild(heading);
+      layout.appendChild(node); return node;
+    }
+    function choices(parent, title, key, values) {
       var row = document.createElement('div'); row.className = 'settings-row'; var label = document.createElement('span'); label.textContent = title; row.appendChild(label);
       var group = document.createElement('div'); group.className = 'choice-group'; row.appendChild(group);
       values.forEach(function (option) {
         var item = button(option[1], 'choice' + (state[key] === option[0] ? ' selected' : ''), key + '-' + option[0], function () {
-          var changes = {}; changes[key] = option[0]; if (!commit(changes)) return; appearance(); openDialog('settings', item.dataset.key);
-        }); item.setAttribute('aria-pressed', String(state[key] === option[0])); group.appendChild(item);
-      }); body.appendChild(row);
+          var changes = {}; changes[key] = option[0]; if (!commit(changes)) return;
+          appearance(); if (key === 'wallpaper') updateCover();
+          openDialog('settings', item.dataset.key);
+        });
+        item.setAttribute('aria-pressed', String(state[key] === option[0])); group.appendChild(item);
+      });
+      parent.appendChild(row);
     }
-    choices('主题', 'theme', [['auto', '自动'], ['dark', '深色'], ['light', '浅色']]);
-    choices('背景', 'wallpaper', [['valley', '山谷'], ['peaks', '雾峰'], ['plain', '纯色']]);
-    TileMotion.settings(body);
-    var actions = document.createElement('div'); actions.className = 'settings-actions'; body.appendChild(actions);
-    actions.appendChild(button('编辑应用', 'list-item', 'edit-home', function () { openDialog('manage'); }));
-    actions.appendChild(button('内容来源', 'list-item', 'sources', function () { openDialog('sources'); }));
-    actions.appendChild(button('LG 系统设置', 'list-item', 'system-settings', function () { launch('com.palm.app.settings'); }));
+    function action(title, meta, file, key, onSelect) {
+      var item = document.createElement('button'); item.className = 'list-item settings-action'; item.dataset.key = key; item.onclick = onSelect;
+      var mark = document.createElement('span'); mark.className = 'mark'; mark.appendChild(icon(file)); item.appendChild(mark);
+      var copy = document.createElement('span'); copy.className = 'settings-action-copy';
+      var name = document.createElement('span'); name.className = 'settings-action-name'; name.textContent = title; copy.appendChild(name);
+      var hint = document.createElement('span'); hint.className = 'settings-action-meta'; hint.textContent = meta; copy.appendChild(hint);
+      item.appendChild(copy);
+      var chevron = document.createElement('span'); chevron.className = 'settings-action-chevron'; chevron.appendChild(icon('arrow-up-right.svg')); item.appendChild(chevron);
+      return item;
+    }
+    var appearanceSection = section('外观');
+    choices(appearanceSection, '主题', 'theme', [['auto', '自动'], ['dark', '深色'], ['light', '浅色']]);
+    choices(appearanceSection, '背景', 'wallpaper', [['valley', '山谷'], ['peaks', '雾峰'], ['plain', '纯色']]);
+    var desktopSection = section('桌面');
+    var actions = document.createElement('div'); actions.className = 'settings-actions'; desktopSection.appendChild(actions);
+    actions.appendChild(action('编辑应用', '首页应用与顺序', 'layout-grid.svg', 'edit-home', function () { openDialog('manage'); }));
+    actions.appendChild(action('内容来源', '公开内容与来源', 'tmdb.svg', 'sources', function () { openDialog('sources'); }));
+    var systemSection = section('系统');
+    systemSection.appendChild(action('LG 系统设置', '电视系统与网络', 'settings.svg', 'system-settings', function () { launch('com.palm.app.settings'); }));
   }
-
   function renderInputs() {
     var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
     var inputs = window.TV_APPS && Array.isArray(TV_APPS.inputs) ? TV_APPS.inputs : [];
@@ -298,63 +492,60 @@
     });
     if (CONFIG.liveTvApp) list.appendChild(button('直播电视', 'list-item', 'live-tv', function () { launch(CONFIG.liveTvApp); }));
   }
-  function moveFocus(key) {
-    var elements = focusables(), current = document.activeElement;
-    if (elements.indexOf(current) < 0) return focusKey('computer');
-    if (overlay.hidden && $('apps').contains(current)) {
-      var row = Number(current.dataset.row), column = Number(current.dataset.column), target;
-      var horizontal = key === 'ArrowLeft' || key === 'ArrowRight', delta = key === 'ArrowRight' || key === 'ArrowDown' ? 1 : -1;
-      var neighbors = Array.prototype.slice.call($('apps').children).filter(function (item) {
-        return horizontal ? Number(item.dataset.row) === row && (Number(item.dataset.column) - column) * delta > 0 : Number(item.dataset.column) === column && Number(item.dataset.row) === row + delta;
-      });
-      if (horizontal) neighbors.sort(function (a, b) { return (Number(a.dataset.column) - Number(b.dataset.column)) * delta; });
-      target = neighbors[0];
-      if (target) { target.focus({ preventScroll: true }); return; }
-      if (key === 'ArrowLeft') { focusKey('computer'); return; }
-      if (key === 'ArrowRight') return;
-    }
-    if (overlay.hidden) {
-      var bounds = $('apps').getBoundingClientRect();
-      elements = elements.filter(function (item) {
-        if (!$('apps').contains(item)) return true;
-        var r = item.getBoundingClientRect();
-        return r.right > bounds.left + 10 && r.left < bounds.right - 10;
-      });
-    }
-    var a = current.getBoundingClientRect(), ax = (a.left + a.right) / 2, ay = (a.top + a.bottom) / 2, best, score = Infinity;
-    elements.forEach(function (el) {
-      if (el === current) return;
-      var b = el.getBoundingClientRect(), dx = (b.left + b.right) / 2 - ax, dy = (b.top + b.bottom) / 2 - ay;
-      var horizontal = key === 'ArrowLeft' || key === 'ArrowRight';
-      var ahead = key === 'ArrowRight' ? dx : key === 'ArrowLeft' ? -dx : key === 'ArrowDown' ? dy : -dy;
-      if (ahead <= 2) return;
-      var overlap = horizontal ? Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) : Math.min(a.right, b.right) - Math.max(a.left, b.left);
-      var gap = key === 'ArrowRight' ? b.left - a.right : key === 'ArrowLeft' ? a.left - b.right : key === 'ArrowDown' ? b.top - a.bottom : a.top - b.bottom;
-      var value = Math.max(0, gap) + Math.abs(horizontal ? dy : dx) * 1.4 + (overlap > 0 ? 0 : 500);
-      if (!best || value < score - 1) { score = value; best = el; }
-    });
-    if (best) { best.focus({ preventScroll: true }); keepPanelFocusVisible(best); }
-  }
-  function resetKeys() { okDown = false; okTarget = null; clearTimeout(okTimer); okTimer = null; }
+
+  menuEl.addEventListener('click', function () {
+    if (zone === 'panel') closePanel(); else { zone = 'menu'; updateZones(); openPanel(); }
+  });
+  panelButtons.forEach(function (item) { item.addEventListener('click', function () { act(item.dataset.action); }); });
+  $('theme').onclick = function () {
+    var wasAuto = state.theme === 'auto';
+    if (!commit({ theme: scene.dataset.theme === 'dark' ? 'light' : 'dark' })) return;
+    appearance();
+    if (wasAuto) toast('已固定主题，可在设置中恢复自动');
+  };
+  $('close').onclick = closeDialog;
+  overlay.addEventListener('click', function (event) { if (event.target === overlay) closeDialog(); });
+  document.addEventListener('focusin', function (event) { keepPanelFocusVisible(event.target); });
+
   document.addEventListener('keydown', function (event) {
-    resetIdle();
-    var key = event.key || { 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 461: 'Escape' }[event.keyCode] || '';
-    if (key.indexOf('Arrow') === 0) {
-      event.preventDefault();
-      if (dialogType === 'order' && movingId) { if (key === 'ArrowUp' || key === 'ArrowDown') moveOrder(key === 'ArrowUp' ? -1 : 1); }
-      else moveFocus(key);
-    } else if (key === 'Enter') {
-      event.preventDefault(); if (okDown) return; okDown = true; okTarget = document.activeElement;
-      if (overlay.hidden && okTarget && state.apps.indexOf(okTarget.dataset.key) >= 0) {
-        okTimer = setTimeout(function () { var id = okTarget && okTarget.dataset.key; okTarget = null; okTimer = null; if (id) { orderDraft = state.apps.slice(); movingId = id; openDialog('order', 'order-' + id); } }, 600);
+    var key = event.key || ({ 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 27: 'Escape', 461: 'Escape' })[event.keyCode] || '';
+    if (!overlay.hidden) {
+      if (key.indexOf('Arrow') === 0) {
+        event.preventDefault();
+        if (dialogType === 'order' && movingId) { if (key === 'ArrowUp' || key === 'ArrowDown') moveOrder(key === 'ArrowUp' ? -1 : 1); }
+        else moveFocus(key);
+      } else if (key === 'Enter') {
+        event.preventDefault(); if (okDown) return; okDown = true; okTarget = document.activeElement;
+      } else if (key === 'Escape' || event.keyCode === 461 || event.keyCode === 27) {
+        event.preventDefault(); resetKeys();
+        if (dialogType === 'order' && movingId) { orderDraft = null; movingId = null; openDialog('order'); }
+        else closeDialog();
+      } else if (key === 'Tab') {
+        var choices = focusables(), at = choices.indexOf(document.activeElement); event.preventDefault();
+        if (choices.length) choices[(at + (event.shiftKey ? -1 : 1) + choices.length) % choices.length].focus();
       }
-    } else if (key === 'Escape' || event.keyCode === 461 || event.keyCode === 27) {
-      event.preventDefault(); resetKeys();
-      if (dialogType === 'order' && movingId) { orderDraft = null; movingId = null; openDialog('order'); }
-      else if (!overlay.hidden) closeDialog();
-    } else if (key.toLowerCase() === 'm' && overlay.hidden) { event.preventDefault(); openDialog('manage'); }
-    else if (key === 'Tab' && !overlay.hidden) {
-      var choices = focusables(), index = choices.indexOf(document.activeElement); event.preventDefault(); choices[(index + (event.shiftKey ? -1 : 1) + choices.length) % choices.length].focus();
+      return;
+    }
+    if (key === 'ArrowDown') {
+      event.preventDefault();
+      if (zone === 'list') { if (index < items.length - 1) setIndex(index + 1); else { zone = 'menu'; updateZones(); } }
+      else if (zone === 'menu') openPanel();
+      else if (zone === 'panel') { menuIndex = Math.min(panelButtons.length - 1, menuIndex + 1); updateZones(); }
+    } else if (key === 'ArrowUp') {
+      event.preventDefault();
+      if (zone === 'list') { if (index > 0) setIndex(index - 1); }
+      else if (zone === 'panel') { if (menuIndex > 0) { menuIndex--; updateZones(); } else { zone = 'menu'; updateZones(); } }
+      else if (zone === 'menu') { zone = 'list'; updateZones(); }
+    } else if (key === 'Enter') {
+      event.preventDefault(); if (okDown) return; okDown = true;
+      if (zone === 'list') launch(items[index].id);
+      else if (zone === 'menu') openPanel();
+      else if (zone === 'panel') act(panelButtons[menuIndex].dataset.action);
+    } else if (key === 'Escape' || key === 'Backspace' || event.keyCode === 461 || event.keyCode === 27) {
+      if (zone === 'panel') { event.preventDefault(); closePanel(); }
+      else if (zone === 'menu') { event.preventDefault(); zone = 'list'; updateZones(); }
+    } else if (key.toLowerCase() === 'm') {
+      event.preventDefault(); openDialog('manage');
     }
   });
   document.addEventListener('keyup', function (event) {
@@ -362,39 +553,26 @@
     event.preventDefault(); var target = okTarget; resetKeys();
     if (target && target === document.activeElement && document.documentElement.contains(target)) target.click();
   });
-  $('computer').onclick = function () { launch(computer); };
-  $('edit').onclick = function () { openDialog('manage'); };
-  $('all').onclick = function () { openDialog('all'); refreshApps(false); };
-  $('inputs').onclick = function () { openDialog('inputs'); };
-  $('network').onclick = function () { if (installed(vpnId)) launch(vpnId); else launch('com.palm.app.settings', { target: 'network' }); };
-  $('settings').onclick = $('appearance').onclick = function () { openDialog('settings'); };
-  $('theme').onclick = function () {
-    var wasAuto = state.theme === 'auto'; if (!commit({ theme: scene.dataset.theme === 'dark' ? 'light' : 'dark' })) return; appearance();
-    if (wasAuto) toast('已固定主题，可在设置中恢复自动');
-  };
-  $('close').onclick = closeDialog;
-  overlay.addEventListener('click', function (event) { if (event.target === overlay) closeDialog(); });
-  document.addEventListener('focusin', function (event) { keepPanelFocusVisible(event.target); revealApp(event.target); });
-  $('apps').addEventListener('scroll', updateShelfEdges, { passive: true });
-  $('apps').addEventListener('wheel', function (event) {
-    if (Math.abs(event.deltaX) > Math.abs(event.deltaY) || !event.deltaY || event.ctrlKey) return;
-    var shelf = $('apps');
-    if (shelf.scrollWidth <= shelf.clientWidth) return;
-    event.preventDefault();
-    var distance = event.deltaY * (event.deltaMode === 1 ? 24 : event.deltaMode === 2 ? shelf.clientWidth : 1);
-    shelf.scrollLeft += distance; resetIdle();
-  }, { passive: false });
-  ['mousedown', 'mousemove', 'wheel'].forEach(function (name) { document.addEventListener(name, resetIdle); });
+
   function resume() {
-    resetKeys(); resetIdle(); clock();
+    resetKeys(); clock();
     if (!overlay.hidden) closeDialog();
+    var wanted = state.lastFocus;
+    items.forEach(function (item, i) { if (item.id === wanted) index = i; });
+    updateList(); updateCover(); updateZones();
     refreshApps(false); refreshVpn();
-    if (!document.activeElement || document.activeElement === document.body) focusKey(state.lastFocus);
   }
   document.addEventListener('webOSRelaunch', resume);
   document.addEventListener('visibilitychange', function () { if (document.hidden) { resetKeys(); vpnRequest++; } else resume(); });
   window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);
-  appearance(); renderApps(); fit(); clock(); resetIdle(); focusKey(state.lastFocus); refreshApps(false); refreshVpn();
-  TileMotion.start();
+
+  backgrounds[0].src = 'assets/valley.jpg'; cards[0].src = 'assets/valley.jpg';
+  frontIndex = 0; frontImage = 'assets/valley.jpg';
+  appearance(); renderList(state.lastFocus); fit(); clock(); updateZones();
+  refreshApps(false); refreshVpn();
+  if (window.PublicContent) {
+    PublicContent.subscribe(function () { preloadCovers(); updateCover(); });
+    PublicContent.start();
+  }
   setInterval(clock, 10000); setInterval(refreshVpn, 20000);
 }());

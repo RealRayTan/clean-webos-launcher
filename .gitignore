@@ -22,6 +22,7 @@ app/apps.js
 
 # Local design explorations and screenshots
 previews/
+.openchamber/
 
 # Runtime public artwork cache
 app/content-cache/
