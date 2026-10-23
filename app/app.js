@@ -9,6 +9,30 @@
   var clockEl = $('clock'), dateEl = $('date'), captionTitle = $('captionTitle'), captionText = $('captionText');
   var weatherIconEl = $('weatherIcon'), weatherTempEl = $('weatherTemp'), weatherDescEl = $('weatherDesc');
   var currentWeather = (typeof window !== 'undefined' && window.TVWeather) ? TVWeather.getCache() : null;
+  var cinemaView = $('cinemaView');
+  var cinemaLayers = [$('cinemaLayerA'), $('cinemaLayerB')], cinemaBgs = [$('cinemaBgA'), $('cinemaBgB')];
+  var cinemaBackBtn = $('cinemaBack'), cinemaTabMovie = $('cinemaTabMovie'), cinemaTabTv = $('cinemaTabTv');
+  var cinemaTitle = $('cinemaTitle'), cinemaOrigin = $('cinemaOrigin'), cinemaScore = $('cinemaScore');
+  var cinemaGenre = $('cinemaGenre'), cinemaDate = $('cinemaDate'), cinemaDesc = $('cinemaDesc');
+  var cinemaStatusText = $('cinemaStatusText'), cinemaTrack = $('cinemaTrack');
+  var cinemaTab = 'movie', cinemaIndex = 0, cinemaFocus = 'shelf', cinemaTopIndex = 1;
+  var cinemaFrontIndex = 0, cinemaCardsData = [], cinemaCardNodes = [];
+  var FALLBACK_TRENDING = {
+    movie: [
+      { id: 'm1', title: '沙丘 2', originalTitle: 'Dune: Part Two (2024)', score: '★ 8.8', votes: '12.4k人评', releaseDate: '2024-03-01', genre: '科幻 · 冒险 · 剧情', overview: '保罗·厄崔迪携手契妮和弗雷曼人，对摧毁其家族的阴谋者展开残酷复仇。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' },
+      { id: 'm2', title: '奥本海默', originalTitle: 'Oppenheimer (2023)', score: '★ 8.3', votes: '16.2k人评', releaseDate: '2023-07-21', genre: '传记 · 剧情 · 历史', overview: '聚焦罗伯特·奥本海默主导曼哈顿计划研发首枚核武器的历程。', backdrop: 'assets/peaks.jpg', poster: 'assets/peaks.jpg' },
+      { id: 'm3', title: '蜘蛛侠：纵横宇宙', originalTitle: 'Spider-Man: Across the Spider-Verse (2023)', score: '★ 8.6', votes: '14.1k人评', releaseDate: '2023-06-02', genre: '动画 · 动作 · 奇幻', overview: '迈尔斯穿越多元宇宙，与蜘蛛格温和蜘蛛联盟共同面对前所未有的宿敌。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' },
+      { id: 'm4', title: '异形：夺命舰', originalTitle: 'Alien: Romulus (2024)', score: '★ 7.9', votes: '8.5k人评', releaseDate: '2024-08-16', genre: '科幻 · 惊悚 · 恐怖', overview: '太空殖民者在探索废弃空间站时，意外唤醒了宇宙中最可怕的外星生命体。', backdrop: 'assets/peaks.jpg', poster: 'assets/peaks.jpg' },
+      { id: 'm5', title: '周处除三害', originalTitle: 'The Pig, the Snake and the Pigeon (2023)', score: '★ 8.1', votes: '9.8k人评', releaseDate: '2023-10-06', genre: '动作 · 犯罪 · 剧情', overview: '通缉重犯陈桂林得知自己身患绝症后，决心查明并铲除排名前两位的罪犯。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' }
+    ],
+    tv: [
+      { id: 't1', title: '人生切割术', originalTitle: 'Severance (2022)', score: '★ 8.7', votes: '11.2k人评', releaseDate: '2022-02-18', genre: '悬疑 · 科幻 · 惊悚', overview: '卢蒙公司员工通过手术将工作与非工作记忆彻底分割。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' },
+      { id: 't2', title: '最后生还者', originalTitle: 'The Last of Us (2023)', score: '★ 8.8', votes: '18.6k人评', releaseDate: '2023-01-15', genre: '末日 · 剧情 · 动作', overview: '乔尔护送拥有免疫抗体的少女艾莉横跨沦陷残酷的美国废土。', backdrop: 'assets/peaks.jpg', poster: 'assets/peaks.jpg' },
+      { id: 't3', title: '鬼灭之刃：柱训练篇', originalTitle: 'Demon Slayer: Hashira Training Arc (2024)', score: '★ 8.9', votes: '15.0k人评', releaseDate: '2024-05-12', genre: '动画 · 动作 · 热血', overview: '为迎战鬼舞辻无惨与即将爆发的终极决战，灶门炭治郎与九柱开启终极特训。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' },
+      { id: 't4', title: '辐射', originalTitle: 'Fallout (2024)', score: '★ 8.4', votes: '13.7k人评', releaseDate: '2024-04-10', genre: '科幻 · 动作 · 冒险', overview: '核战两百年后，生活在豪华地下避难所的纯真居民被迫重返地表废土拯救父亲。', backdrop: 'assets/peaks.jpg', poster: 'assets/peaks.jpg' },
+      { id: 't5', title: '三体', originalTitle: '3 Body Problem (2024)', score: '★ 7.5', votes: '10.9k人评', releaseDate: '2024-03-21', genre: '科幻 · 悬疑 · 剧情', overview: '面对违背现代物理定律的超自然异象，科学家们逐步揭开地外文明入侵危机。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' }
+    ]
+  };
   var focusLine = null;
   var KEY = 'tvhome.tiles.v1';
   var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
@@ -238,6 +262,7 @@
   function act(action) {
     zone = 'menu'; updateZones();
     if (action === 'all') { openDialog('all'); refreshApps(false); }
+    else if (action === 'trending') openCinema();
     else if (action === 'inputs') openDialog('inputs');
     else if (action === 'settings') openDialog('settings');
     else if (action === 'network') {
@@ -245,6 +270,235 @@
       zone = 'list'; updateZones();
     }
   }
+
+  function setCinemaBackdrop(src, skipAnimation) {
+    if (!src) return;
+    var nextIndex = 1 - cinemaFrontIndex;
+    var nextLayer = cinemaLayers[nextIndex];
+    var nextBg = cinemaBgs[nextIndex];
+    var prevLayer = cinemaLayers[cinemaFrontIndex];
+    var prevBg = cinemaBgs[cinemaFrontIndex];
+
+    if (nextBg.getAttribute('src') === src && nextLayer.classList.contains('is-visible')) return;
+    nextBg.src = src;
+
+    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
+    if (useGSAP) {
+      gsap.killTweensOf([nextLayer, prevLayer, nextBg]);
+      nextLayer.classList.add('is-visible');
+      gsap.fromTo(nextBg, { scale: 1.06 }, { scale: 1.02, duration: 0.8, ease: 'power2.out' });
+      gsap.fromTo(nextLayer, { opacity: 0 }, {
+        opacity: 1,
+        duration: 0.45,
+        ease: 'power2.inOut',
+        onComplete: function () {
+          prevLayer.classList.remove('is-visible');
+          gsap.set(prevLayer, { opacity: 0 });
+        }
+      });
+    } else {
+      nextLayer.classList.add('is-visible');
+      prevLayer.classList.remove('is-visible');
+    }
+    cinemaFrontIndex = nextIndex;
+  }
+
+  function updateCinemaTopFocus() {
+    cinemaBackBtn.classList.toggle('focus', cinemaFocus === 'top' && cinemaTopIndex === 0);
+    cinemaTabMovie.classList.toggle('focus', cinemaFocus === 'top' && cinemaTopIndex === 1);
+    cinemaTabTv.classList.toggle('focus', cinemaFocus === 'top' && cinemaTopIndex === 2);
+    cinemaTabMovie.classList.toggle('active', cinemaTab === 'movie');
+    cinemaTabTv.classList.toggle('active', cinemaTab === 'tv');
+    cinemaTabMovie.setAttribute('aria-selected', String(cinemaTab === 'movie'));
+    cinemaTabTv.setAttribute('aria-selected', String(cinemaTab === 'tv'));
+  }
+
+  function setCinemaIndex(next, skipAnimation) {
+    if (!cinemaCardsData.length) return;
+    cinemaIndex = Math.max(0, Math.min(cinemaCardsData.length - 1, next));
+
+    // Centered windowing calculation:
+    // Viewport width 1696px, 310px width + 20px gap = 330px per item
+    // 5 cards fit fully. Keep 2 items on the left when possible to center focus in slot 2.
+    var visibleSlots = 5;
+    var maxOffset = Math.max(0, cinemaCardsData.length - visibleSlots);
+    var targetOffset = Math.max(0, Math.min(cinemaIndex - 2, maxOffset));
+    var targetX = -(targetOffset * 330);
+
+    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
+
+    if (useGSAP) {
+      gsap.to(cinemaTrack, {
+        x: targetX,
+        duration: 0.38,
+        ease: 'power3.out',
+        overwrite: 'auto'
+      });
+    } else {
+      cinemaTrack.style.transform = 'translateX(' + targetX + 'px)';
+    }
+
+    cinemaCardNodes.forEach(function (card, i) {
+      var isFocused = (cinemaFocus === 'shelf' && i === cinemaIndex);
+      card.classList.toggle('focus', isFocused);
+      card.setAttribute('aria-selected', String(i === cinemaIndex));
+      if (useGSAP) {
+        if (isFocused) {
+          gsap.to(card, { scale: 1.05, y: -6, opacity: 1, duration: 0.22, ease: 'power2.out', overwrite: 'auto' });
+        } else {
+          gsap.to(card, { scale: 1.0, y: 0, opacity: 0.72, duration: 0.22, ease: 'power2.out', overwrite: 'auto' });
+        }
+      }
+    });
+
+    if (cinemaFocus === 'shelf') updateCinemaTopFocus();
+
+    var item = cinemaCardsData[cinemaIndex];
+    if (item) {
+      cinemaTitle.textContent = item.title;
+      cinemaOrigin.textContent = item.originalTitle ? '原名：' + item.originalTitle : '';
+      cinemaScore.textContent = item.score + (item.votes ? ' (' + item.votes + ')' : '');
+      cinemaGenre.textContent = item.genre || '影视档案';
+      cinemaDate.textContent = item.releaseDate || '';
+      cinemaDesc.textContent = item.overview || '暂无剧情简介。';
+
+      if (useGSAP) {
+        var metaItems = [cinemaScore, cinemaGenre, cinemaDate, cinemaTitle, cinemaOrigin, cinemaDesc];
+        gsap.fromTo(metaItems,
+          { opacity: 0.25, y: 7 },
+          { opacity: 1, y: 0, duration: 0.28, stagger: 0.02, ease: 'power2.out', overwrite: 'auto' }
+        );
+      }
+      setCinemaBackdrop(item.backdrop, skipAnimation);
+    }
+  }
+
+  function renderCinemaShelf(skipAnimation) {
+    var feed = window.PublicContent ? PublicContent.trending(cinemaTab) : { items: [], status: 'unavailable' };
+    cinemaCardsData = (feed.items && feed.items.length) ? feed.items : (FALLBACK_TRENDING[cinemaTab] || []);
+    if (feed.status === 'live') cinemaStatusText.textContent = 'TMDB 周趋势 · 电视离线缓存';
+    else if (feed.status === 'cached') cinemaStatusText.textContent = 'TMDB 周趋势 · 缓存副本';
+    else if (feed.status === 'unconfigured') cinemaStatusText.textContent = '未配置 TMDB · 显示精选离线片单';
+    else cinemaStatusText.textContent = '周趋势精选 · 电视离线缓存';
+
+    cinemaTrack.innerHTML = '';
+    cinemaCardNodes = [];
+    cinemaCardsData.forEach(function (item, i) {
+      var card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'cinema-card';
+      card.setAttribute('role', 'option');
+      card.setAttribute('aria-label', item.title + '，' + item.score);
+      card.innerHTML =
+        '<div class="cinema-card-thumb"><img src="' + item.poster + '" alt=""></div>' +
+        '<div class="cinema-card-info">' +
+          '<div class="cinema-card-score">' + item.score + '</div>' +
+          '<div class="cinema-card-name">' + item.title + '</div>' +
+          '<div class="cinema-card-sub">' + (item.genre || item.releaseDate) + '</div>' +
+        '</div>';
+      card.addEventListener('click', function () {
+        cinemaFocus = 'shelf';
+        setCinemaIndex(i);
+      });
+      cinemaTrack.appendChild(card);
+      cinemaCardNodes.push(card);
+    });
+    setCinemaIndex(cinemaIndex, skipAnimation);
+  }
+
+  function switchCinemaTab(tab) {
+    if (cinemaTab === tab) return;
+    cinemaTab = tab;
+    cinemaIndex = 0;
+    renderCinemaShelf(true);
+    updateCinemaTopFocus();
+
+    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches);
+    if (useGSAP) {
+      gsap.fromTo(cinemaCardNodes,
+        { opacity: 0, y: 20 },
+        {
+          opacity: 0.72,
+          y: 0,
+          duration: 0.32,
+          stagger: 0.025,
+          ease: 'power2.out',
+          onComplete: function () {
+            if (cinemaCardNodes[0] && cinemaFocus === 'shelf') {
+              gsap.to(cinemaCardNodes[0], { opacity: 1, scale: 1.05, y: -6, duration: 0.16 });
+            }
+          }
+        }
+      );
+    }
+  }
+
+  function openCinema() {
+    zone = 'cinema';
+    cinemaFocus = 'shelf';
+    cinemaTopIndex = cinemaTab === 'movie' ? 1 : 2;
+    cinemaView.hidden = false;
+    renderCinemaShelf(true);
+    updateZones();
+
+    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches);
+    if (useGSAP) {
+      cinemaView.classList.add('is-visible');
+      var topEl = cinemaView.querySelector('.cinema-top');
+      var stageEl = cinemaView.querySelector('.cinema-stage');
+      gsap.killTweensOf([cinemaView, topEl, stageEl]);
+      gsap.fromTo(cinemaView, { opacity: 0, scale: 1.02 }, { opacity: 1, scale: 1, duration: 0.32, ease: 'power3.out' });
+      if (topEl) gsap.fromTo(topEl, { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.38, delay: 0.04, ease: 'power2.out' });
+      if (stageEl) gsap.fromTo(stageEl, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.42, delay: 0.07, ease: 'power2.out' });
+      gsap.fromTo(cinemaCardNodes,
+        { opacity: 0, y: 35 },
+        {
+          opacity: 0.72,
+          y: 0,
+          duration: 0.38,
+          stagger: 0.03,
+          delay: 0.1,
+          ease: 'power2.out',
+          onComplete: function () {
+            if (cinemaCardNodes[cinemaIndex]) {
+              gsap.to(cinemaCardNodes[cinemaIndex], { opacity: 1, scale: 1.05, y: -6, duration: 0.18, ease: 'power2.out' });
+            }
+          }
+        }
+      );
+    } else {
+      requestAnimationFrame(function () {
+        cinemaView.classList.add('is-visible');
+      });
+    }
+  }
+
+  function closeCinema() {
+    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches);
+    if (useGSAP) {
+      gsap.to(cinemaView, {
+        opacity: 0,
+        scale: 0.98,
+        duration: 0.22,
+        ease: 'power2.in',
+        onComplete: function () {
+          cinemaView.classList.remove('is-visible');
+          if (zone !== 'cinema') cinemaView.hidden = true;
+        }
+      });
+    } else {
+      cinemaView.classList.remove('is-visible');
+      setTimeout(function () {
+        if (zone !== 'cinema') cinemaView.hidden = true;
+      }, 280);
+    }
+    zone = 'panel';
+    updateZones();
+  }
+
+  cinemaBackBtn.onclick = closeCinema;
+  cinemaTabMovie.onclick = function () { switchCinemaTab('movie'); };
+  cinemaTabTv.onclick = function () { switchCinemaTab('tv'); };
 
   function contentFor(app, itemOffset) {
     var list = window.PublicContent ? PublicContent.items(app.id) : [];
@@ -719,6 +973,61 @@
 
   document.addEventListener('keydown', function (event) {
     var key = event.key || ({ 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 27: 'Escape', 461: 'Escape', 83: 's', 77: 'm' })[event.keyCode] || '';
+    if (zone === 'cinema') {
+      if (key === 'Escape' || key === 'Backspace' || event.keyCode === 461 || event.keyCode === 27) {
+        event.preventDefault();
+        closeCinema();
+        return;
+      }
+      if (cinemaFocus === 'shelf') {
+        if (key === 'ArrowLeft') {
+          event.preventDefault();
+          setCinemaIndex(cinemaIndex - 1);
+        } else if (key === 'ArrowRight') {
+          event.preventDefault();
+          setCinemaIndex(cinemaIndex + 1);
+        } else if (key === 'ArrowUp') {
+          event.preventDefault();
+          cinemaFocus = 'top';
+          cinemaTopIndex = (cinemaTab === 'movie' ? 1 : 2);
+          updateCinemaTopFocus();
+          cinemaCardNodes.forEach(function (c) {
+            c.classList.remove('focus');
+            if (typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches)) {
+              gsap.to(c, { scale: 1.0, y: 0, opacity: 0.72, duration: 0.2, ease: 'power2.out', overwrite: 'auto' });
+            }
+          });
+        } else if (key === 'Enter') {
+          event.preventDefault();
+          if (cinemaCardNodes[cinemaIndex] && typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches)) {
+            gsap.timeline()
+              .to(cinemaCardNodes[cinemaIndex], { scale: 0.98, duration: 0.08, ease: 'power1.in' })
+              .to(cinemaCardNodes[cinemaIndex], { scale: 1.05, duration: 0.16, ease: 'power2.out' });
+          }
+        }
+      } else if (cinemaFocus === 'top') {
+        if (key === 'ArrowLeft') {
+          event.preventDefault();
+          cinemaTopIndex = Math.max(0, cinemaTopIndex - 1);
+          updateCinemaTopFocus();
+        } else if (key === 'ArrowRight') {
+          event.preventDefault();
+          cinemaTopIndex = Math.min(2, cinemaTopIndex + 1);
+          updateCinemaTopFocus();
+        } else if (key === 'ArrowDown') {
+          event.preventDefault();
+          cinemaFocus = 'shelf';
+          updateCinemaTopFocus();
+          setCinemaIndex(cinemaIndex);
+        } else if (key === 'Enter') {
+          event.preventDefault();
+          if (cinemaTopIndex === 0) closeCinema();
+          else if (cinemaTopIndex === 1) switchCinemaTab('movie');
+          else if (cinemaTopIndex === 2) switchCinemaTab('tv');
+        }
+      }
+      return;
+    }
     if (!overlay.hidden) {
       if (key.indexOf('Arrow') === 0) {
         event.preventDefault();
@@ -768,6 +1077,7 @@
 
   function resume() {
     resetKeys(); clock();
+    if (zone === 'cinema') closeCinema();
     if (!overlay.hidden) closeDialog();
     var wanted = state.lastFocus;
     items.forEach(function (item, i) { if (item.id === wanted) index = i; });
@@ -804,7 +1114,11 @@
     });
   }
   if (window.PublicContent) {
-    PublicContent.subscribe(function () { preloadCovers(); updateCover(); });
+    PublicContent.subscribe(function () {
+      preloadCovers();
+      updateCover();
+      if (zone === 'cinema') renderCinemaShelf();
+    });
     PublicContent.start();
   }
   var weatherWidgetEl = $('weather');

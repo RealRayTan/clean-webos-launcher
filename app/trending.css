@@ -1,0 +1,321 @@
+/* Dedicated Discovery Cinema View (二级影视探索大厅) */
+.cinema-view {
+  position: absolute;
+  inset: 0;
+  width: 1920px;
+  height: 1080px;
+  overflow: hidden;
+  background: #070908;
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 56px 112px 56px;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.02);
+  transition: opacity 280ms cubic-bezier(.22, 1, .36, 1), transform 280ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.cinema-view.is-visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+}
+
+/* Background Layers */
+.cinema-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cinema-layer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 500ms cubic-bezier(.4, 0, .2, 1);
+}
+
+.cinema-layer.is-visible {
+  opacity: 1;
+}
+
+.cinema-bg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 35%;
+  transform: scale(1.04);
+}
+
+.cinema-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(7, 9, 8, 0.72) 0%, rgba(7, 9, 8, 0.25) 32%, rgba(7, 9, 8, 0.8) 68%, rgba(7, 9, 8, 0.98) 100%);
+  pointer-events: none;
+}
+
+/* Header & Controls */
+.cinema-top {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 5;
+}
+
+.cinema-back {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  color: #fff;
+  padding: 10px 22px;
+  font-size: 20px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.cinema-back svg {
+  width: 22px;
+  height: 22px;
+}
+
+.cinema-back.focus,
+.cinema-back:hover {
+  background: rgba(231, 239, 206, 0.22);
+  border-color: #e7efce;
+  color: #e7efce;
+  box-shadow: 0 0 0 2px #e7efce;
+}
+
+.cinema-tabs {
+  display: flex;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  padding: 6px;
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.cinema-tab {
+  padding: 8px 26px;
+  border-radius: 10px;
+  font-size: 20px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.62);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, border-color 140ms ease;
+}
+
+.cinema-tab.active {
+  background: rgba(231, 239, 206, 0.24);
+  color: #e7efce;
+  border-color: rgba(231, 239, 206, 0.4);
+}
+
+.cinema-tab.focus,
+.cinema-tab:hover {
+  border-color: #e7efce;
+  color: #fff;
+}
+
+.cinema-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.cinema-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #30d158;
+  display: inline-block;
+}
+
+/* Stage / Hero Metadata */
+.cinema-stage {
+  position: relative;
+  max-width: 1000px;
+  z-index: 5;
+  margin-top: 10px;
+}
+
+.cinema-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.cinema-badge {
+  font-size: 20px;
+  font-weight: 700;
+  color: #f7ba2a;
+  background: rgba(247, 186, 42, 0.18);
+  padding: 4px 14px;
+  border-radius: 8px;
+}
+
+.cinema-pill {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 14px;
+  border-radius: 8px;
+}
+
+.cinema-title {
+  font-size: 56px;
+  font-weight: 600;
+  letter-spacing: -2px;
+  line-height: 1.15;
+  margin: 0;
+  color: #fff;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.85);
+}
+
+.cinema-origin {
+  font-size: 22px;
+  font-family: Outfit, 'PingFang SC', sans-serif;
+  color: #e7efce;
+  opacity: 0.9;
+  margin: 8px 0 16px;
+  letter-spacing: 0.5px;
+}
+
+.cinema-desc {
+  font-size: 20px;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.86);
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
+  max-width: 920px;
+}
+
+/* Bottom Shelf Cards */
+.cinema-shelf {
+  position: relative;
+  z-index: 5;
+}
+
+.cinema-shelf-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 18px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  margin-bottom: 14px;
+}
+
+.cinema-shelf-head small {
+  font-size: 16px;
+  letter-spacing: 0.5px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.cinema-track-wrap {
+  overflow: hidden;
+  width: 100%;
+}
+
+.cinema-track {
+  display: flex;
+  gap: 20px;
+  will-change: transform;
+}
+
+.cinema-card {
+  flex: 0 0 310px;
+  height: 142px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(22, 28, 24, 0.78);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+  color: #fff;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  will-change: transform, opacity;
+  transform-origin: center bottom;
+  opacity: 0.72;
+}
+
+.cinema-card.focus,
+.cinema-card:hover {
+  border-color: #e7efce;
+  background: rgba(35, 45, 38, 0.95);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.8), 0 0 0 2px #e7efce;
+  opacity: 1;
+}
+
+.cinema-card-thumb {
+  width: 98px;
+  height: 100%;
+  flex-shrink: 0;
+  background: #111613;
+  overflow: hidden;
+}
+
+.cinema-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cinema-card-info {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  overflow: hidden;
+  flex: 1;
+}
+
+.cinema-card-score {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f7ba2a;
+}
+
+.cinema-card-name {
+  font-size: 19px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cinema-card-sub {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

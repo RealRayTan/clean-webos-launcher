@@ -22,6 +22,7 @@ function fixture(t, settings = {}, adjust = () => {}) {
     if (handlers.error) throw handlers.error;
     const data = url.pathname.includes('/watch/providers/') ? handlers.providers
       : url.pathname.includes('/search/') ? handlers.search
+      : url.pathname.includes('/trending/') ? (url.pathname.includes('/movie') ? (handlers.trendingMovie || handlers.movie) : (handlers.trendingTv || handlers.tv))
       : url.pathname.endsWith('/movie') ? handlers.movie : handlers.tv;
     return Buffer.from(JSON.stringify({ results: data }));
   }, image: async url => { images.push(url); return 'content-cache/' + 'a'.repeat(64) + '.jpg'; } });
@@ -109,4 +110,55 @@ test('provider lookup is region-aware, reusable, and credentials can be added wi
 test('malformed credential/config values do not reach the request boundary', async t => {
   const { adapter, calls } = fixture(t, { token: 'bad\r\nAuthorization: injected' });
   await assert.rejects(adapter.fetch('prime'), { code: 'TMDB_CONFIG_INVALID' }); assert.equal(calls.length, 0);
+});
+test('trending fetches movies and tv with localized metadata, original title, and ratings', async t => {
+  const { adapter, calls } = fixture(t, {}, h => {
+    h.trendingMovie = [{
+      id: 693134,
+      title: '沙丘 2',
+      original_title: 'Dune: Part Two',
+      backdrop_path: '/dune_backdrop.jpg',
+      poster_path: '/dune_poster.jpg',
+      release_date: '2024-03-01',
+      vote_average: 8.8,
+      vote_count: 12400,
+      genre_ids: [878, 12],
+      overview: '保罗·厄崔迪携手契妮展开复仇。'
+    }];
+    h.trendingTv = [{
+      id: 95557,
+      name: '人生切割术',
+      original_name: 'Severance',
+      backdrop_path: '/sev_backdrop.jpg',
+      poster_path: '/sev_poster.jpg',
+      first_air_date: '2022-02-18',
+      vote_average: 8.7,
+      vote_count: 3200,
+      genre_ids: [9648, 878],
+      overview: '卢蒙公司员工通过手术将记忆彻底分割。'
+    }];
+  });
+  const movies = await adapter.trending('movie');
+  assert.equal(movies.items.length, 1);
+  assert.equal(movies.items[0].id, 'movie:693134');
+  assert.equal(movies.items[0].title, '沙丘 2');
+  assert.equal(movies.items[0].originalTitle, 'Dune: Part Two (2024)');
+  assert.equal(movies.items[0].score, '★ 8.8');
+  assert.equal(movies.items[0].votes, '12.4k人评');
+  assert.equal(movies.items[0].genre, '科幻 · 冒险');
+  assert.match(movies.items[0].backdrop, /^content-cache\/[a-f0-9]{64}\.jpg$/);
+  assert.match(movies.items[0].poster, /^content-cache\/[a-f0-9]{64}\.jpg$/);
+
+  const shows = await adapter.trending('tv');
+  assert.equal(shows.items.length, 1);
+  assert.equal(shows.items[0].id, 'tv:95557');
+  assert.equal(shows.items[0].title, '人生切割术');
+  assert.equal(shows.items[0].originalTitle, 'Severance (2022)');
+  assert.equal(shows.items[0].genre, '悬疑 · 科幻');
+
+  await assert.rejects(adapter.trending('invalid'), { code: 'TMDB_INVALID_TYPE' });
+});
+test('trending respects missing token configuration', async t => {
+  const { adapter } = fixture(t, { token: '' });
+  await assert.rejects(adapter.trending('movie'), { code: 'TMDB_NOT_CONFIGURED' });
 });

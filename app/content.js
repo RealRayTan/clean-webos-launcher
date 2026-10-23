@@ -1,6 +1,10 @@
 (function () {
   'use strict';
   var providers = {}, listeners = [], refreshing = false, loading = false, timer, apps = [], started = false, reloadRequested = false;
+  var trending = {
+    movie: { items: [], status: 'loading', error: '' },
+    tv: { items: [], status: 'loading', error: '' }
+  };
   var sourceMeta = {
     'com.biliwebos.app': { name: '哔哩哔哩', detail: '公开热门', asset: 'bilibili.svg' },
     'youtube.leanback.v4': { name: 'YouTube', detail: 'NASA 频道精选', asset: 'youtube.svg' },
@@ -35,6 +39,39 @@
         status: source.status, error: source.error || '', sourcePeriod: source.sourcePeriod, credits: source.credits || [] };
     });
     providers = next;
+    if (data.trending && typeof data.trending === 'object') {
+      ['movie', 'tv'].forEach(function (type) {
+        var source = data.trending[type];
+        if (source && Array.isArray(source.items)) {
+          var items = source.items.filter(function (item) {
+            return item && typeof item.title === 'string' && item.title.length <= 400 &&
+              typeof item.backdrop === 'string' && /^content-cache\/[a-f0-9]{64}\.jpg$/.test(item.backdrop) &&
+              (!item.poster || /^content-cache\/[a-f0-9]{64}\.jpg$/.test(item.poster));
+          }).slice(0, 10).map(function (item) {
+            return {
+              id: item.id,
+              mediaType: type,
+              title: item.title,
+              originalTitle: item.originalTitle || '',
+              score: item.score || '',
+              votes: item.votes || '',
+              releaseDate: item.releaseDate || '',
+              genre: item.genre || '',
+              overview: typeof item.overview === 'string' ? item.overview.replace(/\s+/g, ' ').trim().slice(0, 300) : '',
+              backdrop: item.backdrop,
+              poster: item.poster || item.backdrop,
+              sourceUrl: item.sourceUrl
+            };
+          });
+          trending[type] = {
+            items: items,
+            status: source.status || (items.length ? 'live' : 'unavailable'),
+            error: source.error || '',
+            fetchedAt: source.fetchedAt
+          };
+        }
+      });
+    }
     refreshing = !!data.refreshing;
   }
   function schedule() {
@@ -229,6 +266,10 @@
     },
     supports: function (id) { return !!providers[id]; },
     items: function (id) { return providers[id] ? providers[id].items : []; },
+    trending: function (type) {
+      var key = (type === 'shows' || type === 'tv') ? 'tv' : 'movie';
+      return trending[key] || { items: [], status: 'unavailable', error: '' };
+    },
     subscribe: function (listener) { listeners.push(listener); },
     start: function () {
       started = true; load(false);

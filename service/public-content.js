@@ -244,8 +244,73 @@ async function netflix() {
   return { items: output, sourcePeriod: week };
 }
 function prune() {
-  var keep = new Set(); Object.values(providers).forEach(function (p) { p.items.forEach(function (i) { keep.add(path.basename(i.image)); }); });
+  var keep = new Set();
+  Object.values(providers).forEach(function (p) { p.items.forEach(function (i) { keep.add(path.basename(i.image)); }); });
+  ['movie', 'tv'].forEach(function (k) {
+    if (trendingCache[k] && Array.isArray(trendingCache[k].items)) {
+      trendingCache[k].items.forEach(function (i) {
+        if (i.backdrop) keep.add(path.basename(i.backdrop));
+        if (i.poster) keep.add(path.basename(i.poster));
+      });
+    }
+  });
   fs.readdirSync(cacheDir).filter(function (file) { return /^[a-f0-9]{64}\.jpg$/.test(file) && !keep.has(file); }).forEach(function (file) { try { if (Date.now() - fs.statSync(path.join(cacheDir, file)).mtimeMs > 86400000) fs.unlinkSync(path.join(cacheDir, file)); } catch (error) {} });
+}
+var trendingCache = {
+  movie: { items: [], status: 'unconfigured', fetchedAt: null, error: '' },
+  tv: { items: [], status: 'unconfigured', fetchedAt: null, error: '' }
+};
+var trendingRetries = { movie: 0, tv: 0 };
+var TRENDING_TTL = 6 * 3600000;
+function cachedTrending(type) {
+  var file = path.join(cacheDir, 'trending-' + type + '.json');
+  var old;
+  try { old = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) {}
+  if (!old || !Array.isArray(old.items)) old = { items: [], fetchedAt: null };
+  old.items = old.items.filter(function (i) {
+    return i && typeof i.backdrop === 'string' && /^content-cache\/[a-f0-9]{64}\.jpg$/.test(i.backdrop) && fs.existsSync(path.join(appDir, i.backdrop));
+  });
+  if (!old.items.length || !Number.isFinite(Date.parse(old.fetchedAt))) old.fetchedAt = null;
+  return Object.assign(old, { status: old.items.length ? 'cached' : 'unavailable', error: '' });
+}
+function loadCachedTrending() {
+  ['movie', 'tv'].forEach(function (type) {
+    if (!trendingCache[type].items.length) trendingCache[type] = cachedTrending(type);
+  });
+}
+async function refreshTrending(force) {
+  if (!tmdb) return;
+  var config = tmdb.config();
+  ['movie', 'tv'].forEach(async function (type) {
+    if (force) trendingRetries[type] = 0;
+    if (!config.configured) {
+      trendingCache[type].status = trendingCache[type].items.length ? 'cached' : 'unconfigured';
+      trendingCache[type].error = '尚未配置影视资料源';
+      return;
+    }
+    if (!force && trendingCache[type].fetchedAt && Date.now() - Date.parse(trendingCache[type].fetchedAt) < TRENDING_TTL) return;
+    if (!force && Date.now() < (trendingRetries[type] || 0)) return;
+    try {
+      var result = await tmdb.trending(type);
+      if (result && Array.isArray(result.items) && result.items.length) {
+        var data = {
+          items: result.items,
+          fetchedAt: result.fetchedAt || new Date().toISOString(),
+          status: 'live',
+          error: '',
+          mediaType: type,
+          credits: result.credits || []
+        };
+        atomic(path.join(cacheDir, 'trending-' + type + '.json'), data);
+        trendingCache[type] = data;
+      }
+    } catch (error) {
+      trendingRetries[type] = Date.now() + 300000;
+      trendingCache[type].status = trendingCache[type].items.length ? 'cached' : 'unavailable';
+      var errors = { TMDB_NOT_CONFIGURED: '尚未配置影视资料源', TMDB_AUTH_FAILED: '影视资料源凭据无效' };
+      trendingCache[type].error = errors[error.code] || (trendingCache[type].items.length ? '刷新失败，保留上次内容' : '暂时无法获取内容');
+    }
+  });
 }
 function cached(def) {
   var old;
@@ -326,6 +391,7 @@ exports.register = function (service) {
       seen.add(app.id); return true;
     });
     syncApps(apps); scheduleRefresh(); refresh(payload.refresh === true);
-    message.respond({ returnValue: true, version: 2, refreshing: active, providers: providers });
+    loadCachedTrending(); refreshTrending(payload.refresh === true);
+    message.respond({ returnValue: true, version: 2, refreshing: active, providers: providers, trending: trendingCache });
   });
 };

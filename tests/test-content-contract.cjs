@@ -59,3 +59,54 @@ test('a missing credential preserves the brand entry without inventing catalog i
   assert.equal(content.supports('amazon'), true);
   assert.equal(content.items('amazon').length, 0);
 });
+test('trending movies and tv feeds are sanitized and exposed to subscribers', () => {
+  const { content, requests } = client();
+  content.start();
+  const data = catalog();
+  data.trending = {
+    movie: {
+      status: 'live',
+      items: [{
+        id: 'movie:101',
+        title: '沙丘 2',
+        originalTitle: 'Dune: Part Two (2024)',
+        score: '★ 8.8',
+        votes: '12.4k人评',
+        releaseDate: '2024-03-01',
+        genre: '科幻 · 冒险',
+        overview: '保罗复仇记。',
+        backdrop: art,
+        poster: art,
+        sourceUrl: 'https://www.themoviedb.org/movie/101'
+      }]
+    },
+    tv: {
+      status: 'live',
+      items: [{
+        id: 'tv:202',
+        title: '人生切割术',
+        originalTitle: 'Severance (2022)',
+        score: '★ 8.7',
+        backdrop: art,
+        sourceUrl: 'https://www.themoviedb.org/tv/202'
+      }, {
+        id: 'tv:bad',
+        title: 'Bad Artwork',
+        backdrop: 'https://malicious.example/pic.jpg',
+        sourceUrl: 'https://www.themoviedb.org/tv/bad'
+      }]
+    }
+  };
+  requests[0].callback(data);
+  const movies = content.trending('movies');
+  assert.equal(movies.status, 'live');
+  assert.equal(movies.items.length, 1);
+  assert.equal(movies.items[0].title, '沙丘 2');
+  assert.equal(movies.items[0].originalTitle, 'Dune: Part Two (2024)');
+  assert.equal(movies.items[0].score, '★ 8.8');
+
+  const shows = content.trending('shows');
+  assert.equal(shows.status, 'live');
+  assert.equal(shows.items.length, 1);
+  assert.equal(shows.items[0].title, '人生切割术');
+});

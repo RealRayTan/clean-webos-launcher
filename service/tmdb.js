@@ -8,9 +8,19 @@ var CREDITS = [
   { name: 'TMDB', url: 'https://www.themoviedb.org/' },
   { name: 'JustWatch', url: 'https://www.justwatch.com/' }
 ];
+var GENRES = {
+  12: '冒险', 14: '奇幻', 16: '动画', 18: '剧情', 27: '恐怖', 28: '动作', 35: '喜剧', 36: '历史',
+  37: '西部', 53: '惊悚', 80: '犯罪', 99: '纪录', 878: '科幻', 9648: '悬疑', 10402: '音乐',
+  10749: '爱情', 10751: '家庭', 10752: '战争', 10759: '动作冒险', 10762: '少儿', 10763: '新闻',
+  10764: '真人秀', 10765: '科幻奇幻', 10766: '肥皂剧', 10767: '脱口秀', 10768: '战争政治'
+};
 function failure(code, message) { var error = new Error(message); error.code = code; return error; }
 function normalize(value) { return String(value || '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' '); }
-function clean(value) { return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, 180) : ''; }
+function clean(value, limit) { return typeof value === 'string' ? value.replace(/\s+/g, ' ').trim().slice(0, limit || 180) : ''; }
+function mapGenres(ids) {
+  if (!Array.isArray(ids)) return [];
+  return ids.map(function (id) { return GENRES[id]; }).filter(Boolean).slice(0, 3);
+}
 function readConfig(file) {
   var saved = {};
   try { saved = JSON.parse(fs.readFileSync(file, 'utf8')); }
@@ -96,6 +106,71 @@ exports.create = function (options) {
     }
     throw failure('TMDB_IMAGE_UNAVAILABLE', '影视图片暂不可用');
   }
+  async function posterArtwork(path) {
+    var sizes = ['w500', 'w342', 'w185', 'original'];
+    for (var i = 0; i < sizes.length; i++) {
+      try {
+        return await options.image('https://image.tmdb.org/t/p/' + sizes[i] + path);
+      } catch (error) {}
+    }
+    return '';
+  }
+
+  async function fetchTrending(type) {
+    if (type !== 'movie' && type !== 'tv') throw failure('TMDB_INVALID_TYPE', '无效的影视类型');
+    var settings = readConfig(configPath);
+    if (!settings.token) throw failure('TMDB_NOT_CONFIGURED', '尚未配置影视资料源');
+    var today = new Date().toISOString().slice(0, 10);
+    var data = await query('/trending/' + type + '/week', { language: settings.language }, settings);
+    if (!Array.isArray(data.results)) throw failure('TMDB_SOURCE_UNAVAILABLE', '影视周榜暂不可用');
+    var valid = data.results.filter(function (row) {
+      var date = row[type === 'tv' ? 'first_air_date' : 'release_date'];
+      return Number.isSafeInteger(row.id) && row.id > 0 && row.adult !== true &&
+        typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date) && date <= today &&
+        /^\/[A-Za-z0-9_-]+\.(?:jpg|png)$/.test(row.backdrop_path || '') &&
+        /^\/[A-Za-z0-9_-]+\.(?:jpg|png)$/.test(row.poster_path || '');
+    }).slice(0, 12);
+    var items = [];
+    for (var row of valid) {
+      var title = row[type === 'tv' ? 'name' : 'title'] || row[type === 'tv' ? 'original_name' : 'original_title'];
+      if (typeof title !== 'string' || !title.trim() || title.length > 400) continue;
+      var originalName = row[type === 'tv' ? 'original_name' : 'original_title'] || '';
+      var date = row[type === 'tv' ? 'first_air_date' : 'release_date'] || '';
+      var year = date.slice(0, 4);
+      var originalTitle = originalName ? (originalName + (year ? ' (' + year + ')' : '')) : '';
+      try {
+        var backdropImg = await catalogArtwork(row.backdrop_path);
+        var posterImg = await posterArtwork(row.poster_path);
+        var scoreVal = Number(row.vote_average) || 0;
+        var scoreStr = '★ ' + scoreVal.toFixed(1);
+        var votes = Number(row.vote_count) || 0;
+        var votesStr = votes > 1000 ? (votes / 1000).toFixed(1) + 'k人评' : (votes ? votes + '人评' : '');
+        var genres = mapGenres(row.genre_ids);
+        items.push({
+          id: type + ':' + row.id,
+          mediaType: type,
+          title: title.trim(),
+          originalTitle: originalTitle,
+          score: scoreStr,
+          votes: votesStr,
+          releaseDate: date,
+          genre: genres.join(' · ') || (type === 'tv' ? '剧集' : '电影'),
+          overview: clean(row.overview),
+          backdrop: backdropImg,
+          poster: posterImg || backdropImg,
+          sourceUrl: 'https://www.themoviedb.org/' + type + '/' + row.id
+        });
+      } catch (error) {}
+      if (items.length === 8) break;
+    }
+    if (!items.length) throw failure('TMDB_NO_CONTENT', '暂无可用热门内容');
+    return {
+      items: items,
+      fetchedAt: new Date().toISOString(),
+      mediaType: type,
+      credits: CREDITS
+    };
+  }
 
   async function fetchCatalog(key) {
     var settings = readConfig(configPath);
@@ -145,5 +220,5 @@ exports.create = function (options) {
       return match ? 'https://image.tmdb.org/t/p/' + chosen + match.backdrop_path : '';
     } catch (error) { return ''; }
   }
-  return { config: config, platforms: platforms, resolve: resolve, fetch: fetchCatalog, backdrop: backdrop };
+  return { config: config, platforms: platforms, resolve: resolve, fetch: fetchCatalog, backdrop: backdrop, trending: fetchTrending };
 };
