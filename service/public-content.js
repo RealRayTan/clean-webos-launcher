@@ -30,7 +30,7 @@ function proxyPort() {
   return port;
 }
 function shouldProxy(host) {
-  return ['youtube.com', 'ytimg.com', 'netflix.com', 'themoviedb.org', 'tmdb.org'].some(function (suffix) {
+  return ['youtube.com', 'ytimg.com', 'netflix.com', 'themoviedb.org', 'tmdb.org', 'tvmaze.com'].some(function (suffix) {
     return host === suffix || host.endsWith('.' + suffix);
   });
 }
@@ -287,9 +287,13 @@ function scheduleRefresh() {
 }
 function refresh(force) {
   if (active) return;
+  if (force) {
+    retries = {};
+    proxyCache.at = 0;
+  }
   var due = Object.keys(definitions).filter(function (id) {
     var def = definitions[id];
-    return def.enabled && Date.now() >= (retries[id] || 0) && (force || !providers[id].fetchedAt || Date.now() - Date.parse(providers[id].fetchedAt) > def.ttl);
+    return def.enabled && (force || (Date.now() >= (retries[id] || 0) && (!providers[id].fetchedAt || Date.now() - Date.parse(providers[id].fetchedAt) > def.ttl)));
   });
   if (!due.length) return;
   active = true;

@@ -106,7 +106,7 @@ try {
       try {
         var orig = JSON.parse(fs.readFileSync(origFile, 'utf8'));
         var candidate = (orig.settings && orig.settings.lastInputApp) || '';
-        if (/^com\.webos\.app\.(hdmi[1-4]|livetv)$/.test(candidate)) restoreApp = candidate;
+        if (/^com\.webos\.app\.hdmi[1-4]$/.test(candidate)) restoreApp = candidate;
       } catch (e) {}
     }
     if (!restoreApp) restoreApp = 'com.webos.app.hdmi4';
