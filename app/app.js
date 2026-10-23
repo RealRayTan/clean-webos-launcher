@@ -483,9 +483,10 @@
     clearTimeout(carouselTimer);
     if (overlay.hidden) returnZone = zone;
     overlay.hidden = false; dialogType = type; body.innerHTML = ''; body.scrollTop = 0; panel.dataset.view = type;
-    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', devices: '输入源标签' }[type];
+    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', devices: '输入源标签', weather: '天气与日落' }[type];
     if (type === 'all' || type === 'manage') renderCatalog(type === 'manage');
     if (type === 'settings') renderSettings();
+    if (type === 'weather') renderWeather();
     if (type === 'sources') PublicContent.settings(body);
     if (type === 'inputs') renderInputs();
     if (type === 'devices') renderDevices();
@@ -584,11 +585,62 @@
     choices(appearanceSection, '背景', 'wallpaper', [['valley', '山谷'], ['peaks', '雾峰'], ['plain', '纯色']]);
     var desktopSection = section('桌面');
     var actions = document.createElement('div'); actions.className = 'settings-actions'; desktopSection.appendChild(actions);
+    actions.appendChild(action('天气与日落', (currentWeather ? (currentWeather.city + ' · ' + currentWeather.temp + '° ' + currentWeather.text) : '自动定位与气象'), 'sun.svg', 'weather-settings', function () { openDialog('weather'); }));
     actions.appendChild(action('编辑应用', '首页应用与顺序', 'layout-grid.svg', 'edit-home', function () { openDialog('manage'); }));
     actions.appendChild(action('输入源标签', 'HDMI 设备与名称', 'plug-connected.svg', 'input-labels', function () { openDialog('devices'); }));
     actions.appendChild(action('内容来源', '公开内容与来源', 'tmdb.svg', 'sources', function () { openDialog('sources'); }));
     var systemSection = section('系统');
     systemSection.appendChild(action('LG 系统设置', '电视系统与网络', 'settings.svg', 'system-settings', function () { launch('com.palm.app.settings'); }));
+  }
+  function renderWeather() {
+    paragraph('天气与日落时间由 Open-Meteo 实时提供，自动主题跟随当地日出日落平滑切换。');
+    var info = currentWeather || { city: '本地', temp: '--', text: '正在获取', sunrise: '--:--', sunset: '--:--' };
+    var card = document.createElement('div'); card.className = 'settings-row';
+    card.style.padding = '16px 20px'; card.style.background = 'var(--surface)'; card.style.borderRadius = '12px'; card.style.marginBottom = '20px';
+    var title = document.createElement('div'); title.style.fontSize = '24px'; title.style.fontWeight = '500'; title.style.marginBottom = '8px';
+    title.textContent = (info.icon || '☀️') + ' ' + (info.city || '本地') + ' · ' + (typeof info.temp === 'number' ? (info.temp + '°C') : info.temp) + ' ' + (info.text || '');
+    var sub = document.createElement('div'); sub.style.fontSize = '16px'; sub.style.color = 'var(--muted)';
+    sub.textContent = '日出: ' + (info.sunrise || '--:--') + '  •  日落: ' + (info.sunset || '--:--') + (info.isSunset ? '（当前正值日落黄昏）' : '');
+    card.appendChild(title); card.appendChild(sub); body.appendChild(card);
+
+    var citySection = document.createElement('div'); citySection.className = 'settings-row';
+    var label = document.createElement('span'); label.textContent = '城市选择'; citySection.appendChild(label);
+    var group = document.createElement('div'); group.className = 'choice-group'; citySection.appendChild(group);
+
+    var currentConfiguredCity = window.TVWeather ? TVWeather.getCity() : '';
+    var cityPresets = [
+      ['', '自动定位'],
+      ['北京', '北京'],
+      ['上海', '上海'],
+      ['广州', '广州'],
+      ['深圳', '深圳'],
+      ['杭州', '杭州'],
+      ['成都', '成都']
+    ];
+
+    cityPresets.forEach(function (preset) {
+      var selected = (currentConfiguredCity === preset[0]);
+      var btn = button(preset[1], 'choice' + (selected ? ' selected' : ''), 'city-' + (preset[0] || 'auto'), function () {
+        if (window.TVWeather) {
+          TVWeather.setCity(preset[0]);
+          toast('正在切换天气至：' + (preset[1] || '自动定位'));
+          refreshWeather();
+          setTimeout(function () { openDialog('weather', btn.dataset.key); }, 500);
+        }
+      });
+      btn.setAttribute('aria-pressed', String(selected));
+      group.appendChild(btn);
+    });
+    body.appendChild(citySection);
+
+    var refreshBar = document.createElement('div'); refreshBar.style.marginTop = '24px';
+    var refreshBtn = button('立即更新天气数据', 'choice', 'weather-refresh', function () {
+      toast('正在刷新天气与日落数据...');
+      refreshWeather();
+      setTimeout(function () { openDialog('weather', 'weather-refresh'); }, 600);
+    });
+    refreshBar.appendChild(refreshBtn);
+    body.appendChild(refreshBar);
   }
   function inputsList() {
     var inputs = window.TV_APPS && Array.isArray(TV_APPS.inputs) ? TV_APPS.inputs.slice() : [];
@@ -754,6 +806,11 @@
   if (window.PublicContent) {
     PublicContent.subscribe(function () { preloadCovers(); updateCover(); });
     PublicContent.start();
+  }
+  var weatherWidgetEl = $('weather');
+  if (weatherWidgetEl) {
+    weatherWidgetEl.style.cursor = 'pointer';
+    weatherWidgetEl.onclick = function () { openDialog('weather'); };
   }
   setInterval(clock, 10000); setInterval(refreshVpn, 20000); setInterval(refreshWeather, 30 * 60 * 1000);
 }());
