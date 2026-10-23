@@ -1,5 +1,14 @@
 # 版本变化
 
+## 1.5.3 — 2026-10-23
+
+- 屏保改为系统级替换：独立纯黑浮动时钟页 bind mount 覆盖 LG `com.webos.app.screensaver`，不再使用会被原厂屏保盖住的 launcher 内覆盖层。
+- 屏保页支持任意按键退出；服务增加受限的 `closeApp` 方法，屏保页通过它关闭自身。
+- 新增 `screensaver_mode.py off/on`，可单独恢复或重新启用原厂屏保；`desktop_mode.py off` 同时恢复原厂 Home 和屏保。
+- 安装器在升级前关闭正在运行的屏保，安装后重新挂载并注册 `41-gathin-screensaver` 启动钩子。
+- 内容服务读取 Alcyone 的本地 loopback SOCKS 端口，对 YouTube（含 `ytimg.com` 缩略图）、Netflix、TMDB 使用代理；B 站和 Apple TV 仍直连，代理不可用时保留旧封面。
+- 保留 OLED 纯黑主题、HDMI 输入源标签和公开封面刷新；受限网络下失败时保留上次封面，并在内容来源面板显示状态。
+
 ## 1.5.2 — 2026-10-23
 
 - 新增 OLED 安全待机屏保：无操作 3 分钟后纯黑浮动时钟，约每 25 秒位移，任意按键退出。

@@ -7,8 +7,6 @@
   var panelButtons = Array.prototype.slice.call(panelEl.querySelectorAll('.menu-item'));
   var layers = [$('layerA'), $('layerB')], backgrounds = [$('bgA'), $('bgB')], cards = [$('cardA'), $('cardB')];
   var clockEl = $('clock'), dateEl = $('date'), captionTitle = $('captionTitle'), captionText = $('captionText');
-  var screensaver = $('screensaver'), screensaverClockWrap = $('screensaverClockWrap');
-  var screensaverClock = $('screensaverClock'), screensaverDate = $('screensaverDate');
   var focusLine = null;
   var KEY = 'tvhome.tiles.v1';
   var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
@@ -86,8 +84,6 @@
   var dialogType = '', returnZone = 'list', loadingApps = false, lastLaunch = 0, toastTimer;
   var okDown = false, okTarget = null, orderDraft = null, movingId = null;
   var vpnRequest = 0;
-  var screensaverOn = false, lastActivity = Date.now(), screensaverShiftTimer = 0;
-  var IDLE_TIMEOUT_MS = 3 * 60 * 1000, PIXEL_SHIFT_MS = 25 * 1000;
   document.body.classList.toggle('on-tv', TVDevice.available);
 
   function homeIds() { return state.apps.filter(function (id) { return !!installed(id); }); }
@@ -138,35 +134,7 @@
     var date = (now.getMonth() + 1) + '月' + now.getDate() + '日，星期' + '日一二三四五六'.charAt(now.getDay());
     clockEl.textContent = time;
     dateEl.textContent = date;
-    if (screensaverClock) screensaverClock.textContent = time;
-    if (screensaverDate) screensaverDate.textContent = date.replace('，', ' ');
     appearance();
-  }
-  function shiftScreensaverClock() {
-    var maxX = 240, maxY = 140;
-    var x = Math.round((Math.random() - .5) * 2 * maxX);
-    var y = Math.round((Math.random() - .5) * 2 * maxY);
-    if (screensaverClockWrap) screensaverClockWrap.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
-  }
-  function enterScreensaver() {
-    if (screensaverOn || document.hidden || !overlay.hidden || !panelEl.hidden) return;
-    screensaverOn = true;
-    screensaver.hidden = false;
-    shiftScreensaverClock();
-    clearInterval(screensaverShiftTimer);
-    screensaverShiftTimer = setInterval(shiftScreensaverClock, PIXEL_SHIFT_MS);
-  }
-  function exitScreensaver() {
-    if (!screensaverOn) return;
-    screensaverOn = false;
-    screensaver.hidden = true;
-    clearInterval(screensaverShiftTimer);
-    screensaverShiftTimer = 0;
-    lastActivity = Date.now();
-  }
-  function markActivity() {
-    lastActivity = Date.now();
-    if (screensaverOn) exitScreensaver();
   }
 
   function wallpaperSrc() { return state.wallpaper === 'peaks' ? 'assets/peaks.jpg' : 'assets/valley.jpg'; }
@@ -647,8 +615,6 @@
 
   document.addEventListener('keydown', function (event) {
     var key = event.key || ({ 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 27: 'Escape', 461: 'Escape' })[event.keyCode] || '';
-    if (screensaverOn) { event.preventDefault(); exitScreensaver(); return; }
-    lastActivity = Date.now();
     if (!overlay.hidden) {
       if (key.indexOf('Arrow') === 0) {
         event.preventDefault();
@@ -695,7 +661,7 @@
   });
 
   function resume() {
-    resetKeys(); markActivity(); clock();
+    resetKeys(); clock();
     if (!overlay.hidden) closeDialog();
     var wanted = state.lastFocus;
     items.forEach(function (item, i) { if (item.id === wanted) index = i; });
@@ -704,13 +670,10 @@
   }
   document.addEventListener('webOSRelaunch', resume);
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { exitScreensaver(); resetKeys(); vpnRequest++; }
+    if (document.hidden) { resetKeys(); vpnRequest++; }
     else resume();
   });
   window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);
-  ['mousedown', 'mousemove', 'wheel'].forEach(function (name) {
-    document.addEventListener(name, markActivity, { passive: true });
-  });
 
   backgrounds[0].src = 'assets/valley.jpg'; cards[0].src = 'assets/valley.jpg';
   frontIndex = 0; frontImage = 'assets/valley.jpg';
@@ -727,8 +690,4 @@
     PublicContent.start();
   }
   setInterval(clock, 10000); setInterval(refreshVpn, 20000);
-  setInterval(function () {
-    if (!screensaverOn && overlay.hidden && panelEl.hidden && !document.hidden &&
-        Date.now() - lastActivity > IDLE_TIMEOUT_MS) enterScreensaver();
-  }, 10000);
 }());

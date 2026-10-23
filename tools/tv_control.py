@@ -24,8 +24,10 @@ def remote(command, tty=False, timeout=20):
     args += ['root@' + os.environ['TV_HOST'], command]
     return subprocess.run(args, capture_output=True, timeout=timeout)
 
-def call(uri, payload=None, timeout=15):
-    command = 'luna-send -n 1 -w ' + str(timeout * 1000) + ' -f ' + shlex.quote(uri) + ' ' + shlex.quote(json.dumps(payload or {}, ensure_ascii=False))
+def call(uri, payload=None, timeout=15, app_id=None):
+    command = ('luna-send -n 1 -w ' + str(timeout * 1000) + ' -f '
+               + (('-a ' + shlex.quote(app_id) + ' ') if app_id else '')
+               + shlex.quote(uri) + ' ' + shlex.quote(json.dumps(payload or {}, ensure_ascii=False)))
     result = remote(command, tty=True, timeout=timeout + 5)
     output = result.stdout.decode('utf-8', errors='replace').replace('\r\n', '\n')
     if result.returncode or not output.strip():

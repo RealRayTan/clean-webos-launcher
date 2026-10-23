@@ -1,0 +1,16 @@
+{
+  "id": "com.webos.app.screensaver",
+  "version": "1.0.0",
+  "vendor": "tv-vibehack",
+  "type": "web",
+  "main": "index.html",
+  "title": "屏保",
+  "icon": "",
+  "resolution": "1920x1080",
+  "bgColor": "#000000",
+  "disableBackHistoryAPI": true,
+  "noSplashOnLaunch": true,
+  "visible": false,
+  "defaultWindowType": "screenSaver",
+  "requiredPermissions": ["all"]
+}

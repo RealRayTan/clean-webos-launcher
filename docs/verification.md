@@ -112,6 +112,26 @@ Prime 动态封面已在 LG C5 实机显示并截图，首页保留六个应用�
 
 电视端 1.5.2 已安装；OLED 纯黑主题、输入源标签面板和 HDMI 1 → PS5 已通过遥控确认。
 
-屏保的自动触发没有在电视上出现：静置 195 秒后，C5 的 LG 系统先进入自己的屏幕关闭提示（“要重新打开屏幕，请按除电源按钮外的任意按键”），应用内屏保没有机会显示。当前电视端仍保留应用屏保代码和本地手动验证；是否调整 LG 节能设置或把应用阈值提前到 2 分钟，需要单独决定。
+屏保的自动触发没有在电视上出现：静置 195 秒后，C5 的 LG 系统先进入自己的屏幕关闭提示（“要重新打开屏幕，请按除电源按钮外的任意按键”），应用内屏保没有机会显示。1.5.3 已移除该覆盖层，改为系统屏保替换；1.5.2 的这段记录保留为问题来源。
 
 HDMI 标签目前使用文字色标，不引入 FreeMyTV 的品牌 logo 素材，避免额外商标素材分发。
+
+## 1.5.3 系统屏保替换与来源网络
+
+2026-10-23 安装 1.5.3。安装器把独立屏保页复制到 `/var/lib/lg-c5-home/screensaver`，bind mount 到 `/usr/palm/applications/com.webos.app.screensaver`，并注册 `41-gathin-screensaver`；系统 Home 挂载和共享状态保持 1.5.3。安装后 `/usr/palm/applications/com.webos.app.screensaver/appinfo.json` 为 `com.webos.app.screensaver`、`version 1.0.0`、`defaultWindowType screenSaver`。
+
+首次用 `com.webos.applicationManager/launch` 手动启动屏保，电视显示纯黑浮动时钟，截图保存为 `docs/images/screensaver-1.5.3.png`。这次手动启动不是系统空闲路径：按 Back、Home 都没有退出，因为应用管理器手动启动不会经过系统屏保的按键关闭逻辑。为恢复电视，最后重启了一次 C5；重启后系统 Home 正常挂载，原厂屏保尚未挂载（`41` 钩子被先前的 `screensaver_mode.py off` 移除）。随后用 `screensaver_mode.py on` 重新挂载，并补上屏保页的任意键退出逻辑：页面收到按键后调用状态服务的受限 `closeApp`，服务再关闭 `com.webos.app.screensaver`。
+
+升级时如果在屏保前台运行 `as-home.sh`，`systemctl restart sam` 可能阻塞，安装器因此改为在停止助手前先请求关闭屏保；如果屏保是手动启动、服务不可用，安装仍可能需要先在电视上按键退出或重启。
+
+随后用 `screensaver_mode.py on` 重新挂载，记录一次真实的系统空闲路径：12:47 回到桌面后不再操作，约 3 分钟后电视自动显示纯黑浮动时钟，截图 `1.5.3-screensaver-auto.png`（README 使用 `docs/images/screensaver-1.5.3.png`）；按一次方向上键后立即回到桌面，截图 `1.5.3-screensaver-auto-exit.png`。这次确认的是系统自动入口和任意键退出，不是应用管理器手动启动。电视上原来的 LG 时钟没有再出现。
+
+### 封面来源网络
+
+电视端服务状态显示 B 站 `fetchedAt 12:25`、Apple TV `12:27` 已更新；Netflix、YouTube、Prime/TMDB 刷新失败并保留旧缓存。同一时间从电视直连测试：YouTube RSS 超时、Netflix Tudum TSV `403`、TMDB API 超时、TVmaze `200`、B 站 `200`、Apple `200`。Mac 上 YouTube 和 Netflix 同一 URL 返回 `200`，因此不是缓存 TTL 或代码路径问题，而是电视当前网络限制。Alcyone `vpnStatus` 返回 `connected:false`。
+
+随后在电视上打开 Alcyone，确认界面显示 `Connected`。再手动强制刷新一次：B 站和 Apple TV 为 live，Netflix、YouTube、Prime 仍为 cached/刷新失败，说明服务进程的直连请求没有走 Alcyone 的应用级网络路径。检查 Alcyone 的 `sing-box` 配置发现 loopback SOCKS 入站 `127.0.0.1:10801`。从电视用 curl 经该 SOCKS 请求：Netflix Tudum `200`、NASA RSS `200`、TMDB 无凭据请求 `401`（与直接请求一致，证明连接已到达 API）。
+
+1.5.3 的内容服务随后增加 SOCKS5 支持：读取 Alcyone 配置中的 loopback SOCKS 端口，只对 YouTube、Netflix、TMDB 使用代理，B 站和 Apple TV 直连；不读取 Alcyone 的出站节点或凭据。第一次安装后手动强制刷新时，B 站、Apple TV、Netflix、Prime/TMDB 均为 live；YouTube 仍失败，原因是封面缩略图域名 `i.ytimg.com` 没有走代理。把 `ytimg.com` 加入代理域名后重新安装并再次强制刷新，五个来源全部为 live：B 站、Apple TV、Netflix、Prime/TMDB、YouTube 的 `fetchedAt` 均为 12:59，YouTube 首条为 NASA 直播。之前“只有 B 站更新”的直接网络原因由此闭环。
+
+代理不可用时是否保留缓存、5 分钟自动周期在 VPN 下的稳定性尚未单独复验；这次确认的是手动强制刷新和 Alcyone 连接状态。

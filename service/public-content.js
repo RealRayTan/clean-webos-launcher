@@ -1,6 +1,7 @@
 'use strict';
 // Public catalog cache. No account cookies, tokens or arbitrary request URLs.
 var fs = require('fs'), path = require('path'), https = require('https'), crypto = require('crypto');
+var net = require('net'), tls = require('tls');
 var APP = 'com.gathin.tvhome';
 var ALLOWED = ['com.gathin.tvhome', 'com.webos.app.home'];
 var appDir = '/media/developer/apps/usr/palm/applications/' + APP;
@@ -14,6 +15,80 @@ var nativeSources = {
 };
 var nativeActions = { 'com.biliwebos.app': '查看视频来源', 'youtube.leanback.v4': '查看视频来源', netflix: '查看榜单来源', 'com.apple.appletv': '查看官方介绍' };
 var definitions = {}, tmdb;
+var proxyCache = { at: 0, port: 0, agents: {} };
+function proxyPort() {
+  if (Date.now() - proxyCache.at < 30000) return proxyCache.port;
+  var port = 0;
+  try {
+    var config = JSON.parse(fs.readFileSync('/var/lib/alcyone-singbox/core-config.json', 'utf8'));
+    var inbound = (config.inbounds || []).find(function (value) {
+      return value && value.type === 'socks' && /^127\.0\.0\.1$/.test(value.listen || '') && Number.isInteger(value.listen_port);
+    });
+    if (inbound) port = inbound.listen_port;
+  } catch (error) {}
+  proxyCache = { at: Date.now(), port: port, agents: proxyCache.agents };
+  return port;
+}
+function shouldProxy(host) {
+  return ['youtube.com', 'ytimg.com', 'netflix.com', 'themoviedb.org', 'tmdb.org'].some(function (suffix) {
+    return host === suffix || host.endsWith('.' + suffix);
+  });
+}
+function socksConnect(proxy, host, port) {
+  return new Promise(function (resolve, reject) {
+    var socket = net.connect({ host: '127.0.0.1', port: proxy });
+    var buffer = Buffer.alloc(0), stage = 0, finished = false;
+    var timer = setTimeout(function () { done(new Error('SOCKS timeout')); }, 10000);
+    function done(error) {
+      if (finished) return;
+      finished = true; clearTimeout(timer);
+      if (error) { socket.destroy(); reject(error); }
+      else resolve(socket);
+    }
+    function onData(chunk) {
+      buffer = Buffer.concat([buffer, chunk]);
+      if (stage === 0) {
+        if (buffer.length < 2) return;
+        if (buffer[0] !== 5 || buffer[1] !== 0) return done(new Error('SOCKS authentication unavailable'));
+        buffer = buffer.slice(2); stage = 1;
+        var name = Buffer.from(host, 'utf8');
+        var greeting = Buffer.alloc(7 + name.length);
+        greeting[0] = 5; greeting[1] = 1; greeting[2] = 0; greeting[3] = 3; greeting[4] = name.length;
+        name.copy(greeting, 5); greeting.writeUInt16BE(port, 5 + name.length);
+        socket.write(greeting);
+      }
+      if (stage === 1) {
+        if (buffer.length < 4) return;
+        var type = buffer[3], need;
+        if (type === 1) need = 10;
+        else if (type === 4) need = 22;
+        else if (type === 3) { if (buffer.length < 5) return; need = 7 + buffer[4]; }
+        else return done(new Error('SOCKS reply invalid'));
+        if (buffer.length < need) return;
+        if (buffer[1] !== 0) return done(new Error('SOCKS connect failed'));
+        socket.removeListener('data', onData); socket.removeListener('error', done);
+        done(null);
+      }
+    }
+    socket.on('connect', function () { socket.write(Buffer.from([5, 1, 0])); });
+    socket.on('data', onData);
+    socket.on('error', done);
+  });
+}
+function proxyAgent(port) {
+  if (proxyCache.agents[port]) return proxyCache.agents[port];
+  var agent = new https.Agent({ keepAlive: false });
+  agent.createConnection = function (options, callback) {
+    var host = options.host || options.hostname;
+    socksConnect(port, host, Number(options.port) || 443).then(function (socket) {
+      var secure = tls.connect({ socket: socket, servername: host });
+      secure.once('secureConnect', function () { callback(null, secure); });
+      secure.once('error', function (error) { socket.destroy(); callback(error); });
+    }, callback);
+  };
+  proxyCache.agents[port] = agent;
+  return agent;
+}
 function request(url, limit, headers, redirects) {
   return new Promise(function (resolve, reject) {
     var parsed;
@@ -21,10 +96,12 @@ function request(url, limit, headers, redirects) {
     var allowed = ['bilibili.com', 'youtube.com', 'apple.com', 'netflix.com', 'tvmaze.com', 'hdslb.com', 'ytimg.com', 'api.themoviedb.org', 'image.tmdb.org'];
     if (parsed.protocol !== 'https:' || parsed.username || parsed.password || !allowed.some(function (host) { return parsed.hostname === host || parsed.hostname.endsWith('.' + host); })) return reject(new Error('Source not allowed'));
     if (headers && headers.Authorization && parsed.hostname !== 'api.themoviedb.org') return reject(new Error('Authentication host not allowed'));
+    var proxy = proxyPort();
+    var agent = proxy && shouldProxy(parsed.hostname) ? proxyAgent(proxy) : undefined;
     var finished = false, req;
     var deadline = setTimeout(function () { done(new Error('Source timeout')); if (req) req.destroy(); }, 12000);
     function done(error, data) { if (finished) return; finished = true; clearTimeout(deadline); if (error) reject(error); else resolve(data); }
-    req = https.get(url, { headers: Object.assign({ 'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity', Referer: 'https://www.bilibili.com/' }, headers || {}) }, function (res) {
+    req = https.get(url, { headers: Object.assign({ 'User-Agent': 'Mozilla/5.0', 'Accept-Encoding': 'identity', Referer: 'https://www.bilibili.com/' }, headers || {}), agent: agent }, function (res) {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && (redirects || 0) < 3) {
         var next = new URL(res.headers.location, url);
         if (headers && headers.Authorization && next.origin !== parsed.origin) { res.resume(); done(new Error('Authenticated redirect not allowed')); return; }

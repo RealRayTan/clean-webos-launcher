@@ -12,14 +12,21 @@ if sys.argv[1:] == ['off']:
     command = (
         f'mkdir -p {STATE}; touch {STATE}/disabled; '
         f'rm -f /var/lib/webosbrew/init.d/40-gathin-as-home /var/lib/webosbrew/init.d/60-lg-c5-home '
+        f'/var/lib/webosbrew/init.d/41-gathin-screensaver '
         f'{STATE}/system-home {STATE}/native-enabled; '
         f'umount {DST} 2>/dev/null || true; '
+        f'umount /usr/palm/applications/com.webos.app.screensaver 2>/dev/null || true; '
         f'umount {SRC}/appinfo.json 2>/dev/null || true; '
         f'if [ -f {STATE}/keybinds.before.json ]; then '
         f'cp {STATE}/keybinds.before.json /home/root/.config/lginputhook/keybinds.json; fi; '
         'systemctl restart sam || true; '
         'rm -f /tmp/homeback-remote-ipc/lease'
     )
+    try:
+        call('luna://com.gathin.tvhome.service/closeApp',
+             {'id': 'com.webos.app.screensaver'}, timeout=3)
+    except Exception:
+        pass
     result = remote(command)
     if result.returncode:
         raise RuntimeError(result.stderr.decode())
@@ -37,10 +44,17 @@ if sys.argv[1:] == ['off']:
         print('Desktop disabled; stock Home launch unavailable:', error)
     print('System home disabled. Root and all installed apps are retained.')
 elif sys.argv[1:] == ['on']:
+    try:
+        call('luna://com.gathin.tvhome.service/closeApp',
+             {'id': 'com.webos.app.screensaver'}, timeout=3)
+    except Exception:
+        pass
     command = (
         f'rm -f {STATE}/disabled; '
         'ln -sf ' + SVC + '/as-home.sh /var/lib/webosbrew/init.d/40-gathin-as-home; '
-        f'sh {SVC}/as-home.sh'
+        'ln -sf ' + SVC + '/screensaver-as-system.sh /var/lib/webosbrew/init.d/41-gathin-screensaver; '
+        f'sh {SVC}/as-home.sh; '
+        f'sh {SVC}/screensaver-as-system.sh'
     )
     result = remote(command)
     if result.returncode:

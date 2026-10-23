@@ -52,7 +52,7 @@ python3 scripts/prepare_native.py /absolute/path/to/native-artifact
 bash scripts/build.sh
 ```
 
-输出为 `build/com.gathin.tvhome_1.5.2_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
+输出为 `build/com.gathin.tvhome_1.5.3_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
 
 ## 安装并启用
 
@@ -68,8 +68,9 @@ bash scripts/build.sh
 4. 启动普通桌面一次，把已有首页应用、顺序、主题和背景同步到 `/var/lib/lg-c5-home/app-state.json`，供系统 Home 副本读取。
 5. 保留并恢复原键位配置，关闭原生 Home 适配器，将桌面 bind mount 到 LG 原厂 Home 的 appid，并重启系统应用管理器 `sam`。
 6. 将 `homeAutoLaunch` 设为 `off`，把启动输入指到桌面，注册启动钩子和助手。
+7. 把独立屏保页复制到 `/var/lib/lg-c5-home/screensaver`，bind mount 到 LG 原厂屏保的 appid，注册 `41-gathin-screensaver` 启动钩子。
 
-工具不重启电视。启用后短按 Home、应用退出和开机都会直接到桌面。应用内返回键无法退出时，长按返回约 0.7 秒回到桌面。
+工具不重启电视。启用后短按 Home、应用退出和开机都会直接到桌面。应用内返回键无法退出时，长按返回约 0.7 秒回到桌面。电视空闲 3 分钟后由系统启动纯黑浮动时钟屏保，任意按键退出。
 
 ## 停用与恢复启用
 
@@ -78,6 +79,13 @@ bash scripts/build.sh
 .venv/bin/python tools/desktop_mode.py on
 ```
 
-`off` 写停用标记、移除系统 Home 与启动钩子、卸载 bind mount、恢复原键位和 LG 原厂 Home，再重启 `sam`。它保留应用、root 和最近输入源设置。`on` 重新执行系统 Home 挂载和启动钩子。
+`off` 写停用标记、移除系统 Home 和屏保的启动钩子、卸载 Home/appinfo/屏保的 bind mount、恢复原键位和 LG 原厂 Home/屏保，再重启 `sam`。它保留应用、root 和最近输入源设置。`on` 重新执行系统 Home 和屏保的挂载及启动钩子。
 
-系统 Home 使用 bind mount 覆盖，不写入系统分区。停用桌面不等于撤销 root；本仓库没有完整 unroot 流程。
+只恢复 LG 原厂屏保、保留自定义桌面时使用：
+
+```sh
+.venv/bin/python tools/screensaver_mode.py off
+.venv/bin/python tools/screensaver_mode.py on
+```
+
+系统 Home 和屏保都使用 bind mount 覆盖，不写入系统分区。停用桌面不等于撤销 root；本仓库没有完整 unroot 流程。

@@ -52,7 +52,19 @@ flowchart LR
 
 `service/service.js` 在系统 Home 模式下让 Home 键走 webOS 原生路径，不再启动旧助手。返回键事件仍被非阻塞读取：短按不处理，长按约 650 毫秒且前台是内容应用时，启动系统 Home。`return-origin` 在该模式下停用，`resume-state` 的桌面目标改为 `com.webos.app.home`。
 
-`tools/desktop_mode.py off` 卸载两个 bind mount、移除系统 Home 标记和启动钩子、恢复键位并重启 `sam`，然后打开原厂 Home；`on` 重新执行挂载脚本。
+`tools/desktop_mode.py off` 卸载系统 Home 和屏保的 bind mount、移除启动钩子、恢复键位并重启 `sam`，然后打开原厂 Home；`on` 重新执行两个挂载脚本。
+
+## 1.5.3 系统屏保
+
+1.5.2 的屏保是 launcher 内的覆盖层，和 LG 系统屏保都以 3 分钟为阈值；系统屏保窗口在 launcher 之上，所以用户实际看到的是原厂时钟。1.5.3 改为和系统 Home 相同的替换方式，但对象是 `com.webos.app.screensaver`。
+
+独立页位于 `service/screensaver-app`，是一个 `type: web`、`defaultWindowType: screenSaver` 的 appinfo 和纯黑时钟页。`service/screensaver-as-system.sh` 把它复制到 `/var/lib/lg-c5-home/screensaver`，bind mount 到原厂屏保目录，重启 `sam`，并在 `/var/lib/webosbrew/init.d/41-gathin-screensaver` 注册启动钩子。原厂 Flutter 文件不写入、不删除；卸载挂载即恢复。
+
+屏保页的时钟每秒更新，整组时钟每 25 秒随机位移。它不再把按键完全交给系统：收到任意按键、鼠标按下或滚轮后，先调用电视端服务的受限 `closeApp` 关闭 `com.webos.app.screensaver`；如果服务不可用，再尝试 `window.close()`。`closeApp` 接受屏保、普通桌面、系统 Home 三个 sender，以及没有 sender 的 root 维护工具，避免成为任意第三方应用的通用关闭接口。
+
+安装器在停止助手前先请求关闭正在运行的屏保，避免 `as-home.sh` 的 `systemctl restart sam` 被屏保前台阻塞；安装完成后再关闭一次并重新挂载屏保。`screensaver_mode.py off/on` 单独恢复或重新启用屏保，`desktop_mode.py off` 同时处理 Home 和屏保。
+
+公开封面服务仍然每 5 分钟检查。YouTube RSS、Netflix Tudum 和 TMDB 在受限网络下会超时或 403，服务保留上次封面并将错误写入内容来源状态；B 站和 Apple TV 通常可直连。1.5.3 读取 `/var/lib/alcyone-singbox/core-config.json` 中的 loopback SOCKS 入站端口，对 YouTube（含 `ytimg.com` 缩略图）、Netflix、TMDB 使用 SOCKS5 代理，其他公开源直连；服务不读取 Alcyone 的出站节点或凭据。代理不可用时请求失败，缓存保留。
 
 ## 旧版 Home 接管与返回来源
 

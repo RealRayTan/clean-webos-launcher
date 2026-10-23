@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>屏保</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; margin: 0; overflow: hidden;
+    background: #000; cursor: none;
+  }
+  body {
+    display: flex; align-items: center; justify-content: center;
+    font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "Helvetica Neue", Arial, sans-serif;
+  }
+  .screensaver-clock-wrap {
+    text-align: center;
+    transition: transform 1.4s ease-in-out;
+    will-change: transform;
+  }
+  .screensaver-clock {
+    color: rgba(255, 255, 255, .82);
+    font-size: 132px; font-weight: 200; line-height: 1;
+    letter-spacing: -2px; font-variant-numeric: tabular-nums;
+  }
+  .screensaver-date {
+    margin-top: 10px;
+    color: rgba(255, 255, 255, .4);
+    font-size: 22px; font-weight: 400; letter-spacing: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .screensaver-clock-wrap { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <div id="screensaverClockWrap" class="screensaver-clock-wrap">
+    <div id="screensaverClock" class="screensaver-clock"></div>
+    <div id="screensaverDate" class="screensaver-date"></div>
+  </div>
+  <script>
+    (function () {
+      'use strict';
+      var wrap = document.getElementById('screensaverClockWrap');
+      var clock = document.getElementById('screensaverClock');
+      var date = document.getElementById('screensaverDate');
+      var SHIFT_MS = 25 * 1000;
+
+      function tick() {
+        var now = new Date();
+        var h = now.getHours();
+        var time = ('0' + h).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+        var label = (now.getMonth() + 1) + '月' + now.getDate() + '日 星期' + '日一二三四五六'.charAt(now.getDay());
+        clock.textContent = time;
+        date.textContent = label;
+      }
+      function shift() {
+        var x = Math.round((Math.random() - .5) * 480);
+        var y = Math.round((Math.random() - .5) * 280);
+        wrap.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+      }
+
+      var closing = false;
+      function closeScreenSaver() {
+        if (closing) return;
+        closing = true;
+        try {
+          if (typeof PalmServiceBridge === 'function') {
+            var bridge = new PalmServiceBridge();
+            bridge.call('luna://com.gathin.tvhome.service/closeApp',
+              JSON.stringify({ id: 'com.webos.app.screensaver' }));
+          }
+        } catch (error) {}
+        setTimeout(function () { try { window.close(); } catch (error) {} }, 300);
+      }
+
+      tick();
+      shift();
+      setInterval(tick, 1000);
+      setInterval(shift, SHIFT_MS);
+      ['keydown', 'mousedown', 'wheel'].forEach(function (name) {
+        document.addEventListener(name, function (event) {
+          event.preventDefault();
+          closeScreenSaver();
+        }, true);
+      });
+    }());
+  </script>
+</body>
+</html>

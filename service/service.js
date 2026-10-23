@@ -72,6 +72,16 @@ service.register('status', function (message) {
   message.respond({ returnValue: true, pid: process.pid, root: process.getuid() === 0, enabled: enabled(), mode: isSystemHome() ? 'system-home' : 'helper-home', target: target(), inputDevices: inputFiles.length, startupMode: 'remember-desktop-or-input', resume: resumeStatus(), returnOrigin: returnOrigin.status() });
 });
 service.register('open', function (message) { launch('requested'); message.respond({ returnValue: true }); });
+service.register('closeApp', function (message) {
+  var allowed = ['com.webos.app.screensaver', 'com.gathin.tvhome', 'com.webos.app.home'];
+  if (message.sender && allowed.indexOf(message.sender) < 0) return message.respond({ returnValue: false, errorText: 'Caller not allowed' });
+  var id = message.payload && message.payload.id;
+  if (typeof id !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(id)) return message.respond({ returnValue: false, errorText: 'Invalid app id' });
+  service.call('luna://com.webos.applicationManager/close', { id: id }, function (response) {
+    var payload = response && response.payload;
+    message.respond({ returnValue: !!(payload && payload.returnValue), response: payload });
+  });
+});
 require('./app-catalog').register(service);
 require('./app-state').register(service);
 try { require('./public-content').register(service); } catch (error) { log('content unavailable: ' + error.message); }
