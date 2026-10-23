@@ -52,7 +52,7 @@ python3 scripts/prepare_native.py /absolute/path/to/native-artifact
 bash scripts/build.sh
 ```
 
-输出为 `build/com.gathin.tvhome_1.5.0_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
+输出为 `build/com.gathin.tvhome_1.5.1_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
 
 ## 安装并启用
 

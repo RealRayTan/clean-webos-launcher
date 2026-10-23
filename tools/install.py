@@ -24,6 +24,10 @@ except (RuntimeError, subprocess.TimeoutExpired):
 if status:
     pid = int(status['pid'])
     checked(f'if [ "$(readlink /proc/{pid}/cwd)" = /media/developer/apps/usr/palm/services/com.gathin.tvhome.service ]; then kill {pid}; fi')
+# Remove the system-home mounts before replacing the app. Otherwise the old
+# appinfo bind mount can survive the update and report the previous version.
+checked('umount -l /usr/palm/applications/com.webos.app.home 2>/dev/null || true; '
+        'umount -l /media/developer/apps/usr/palm/applications/com.gathin.tvhome/appinfo.json 2>/dev/null || true')
 scp = ssh_args()
 scp[0] = 'scp'
 subprocess.run(scp[:1] + ['-O'] + scp[1:] + [str(package), 'root@' + os.environ['TV_HOST'] + ':/tmp/lg-webos-desktop.ipk'], check=True)
@@ -37,6 +41,9 @@ except subprocess.TimeoutExpired:
     output, error = process.communicate(timeout=5)
 if b'"state": "installed"' not in output:
     raise RuntimeError((output + error).decode(errors='replace'))
+appinfo = remote('cat /media/developer/apps/usr/palm/applications/com.gathin.tvhome/appinfo.json')
+if appinfo.returncode or ('"version": "' + version + '"').encode() not in appinfo.stdout:
+    raise RuntimeError('Installed app version does not match ' + version)
 checked('/media/developer/apps/usr/palm/services/org.webosbrew.hbchannel.service/elevate-service com.gathin.tvhome.service')
 
 # The regular app still has the user's localStorage. Launch it once so the new
@@ -47,8 +54,10 @@ try:
 except (RuntimeError, subprocess.TimeoutExpired, TimeoutError) as error:
     print('State sync launch unavailable:', error)
 
-# Mount the app as LG's Home and keep the normal app entry hidden. The script
-# restores the native Home key path, disables the old helper, and restarts sam.
+# An update replaces the source app; unmount the old system-home copy first so
+# the new files and CSS are what sam reads, then remount.
+checked('umount -l /usr/palm/applications/com.webos.app.home 2>/dev/null || true; '
+        'umount -l /media/developer/apps/usr/palm/applications/com.gathin.tvhome/appinfo.json 2>/dev/null || true')
 checked('mkdir -p /var/lib/webosbrew/init.d; '
         'rm -f /var/lib/lg-c5-home/disabled; '
         'ln -sf /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/as-home.sh /var/lib/webosbrew/init.d/40-gathin-as-home; '

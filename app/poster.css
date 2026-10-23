@@ -713,3 +713,25 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
 .scene[data-theme="light"] .menu-item small { color: var(--muted); }
 .scene[data-theme="light"] .menu-item.focus small { color: rgba(243,245,238,.82); }
 .scene[data-theme="light"] .overlay { background: rgba(27,36,30,.34); }
+
+/* Chosen light palette: cold stone. Lower luminance than the old #E9ECE4 paper. */
+.scene[data-theme="light"]{
+  --bg:#D8DDE0; --ink:#1C2124; --muted:#596265; --focus:#465E5E;
+  --line:#C4CBCE; --surface:#D2D8DA; --panel:#E6EBED; color-scheme:light;
+}
+.scene[data-theme="light"] .cover,
+.scene[data-theme="light"] .cover-layer{background:#D8DDE0}
+.scene[data-theme="light"] .cover-left{background:linear-gradient(90deg,#D8DDE0 0%,#D8DDE0 18%,rgba(230,235,237,.94) 28%,rgba(230,235,237,.66) 40%,rgba(230,235,237,.22) 50%,transparent 60%)}
+.scene[data-theme="light"] .top-right,
+.scene[data-theme="light"] .caption{background:rgba(230,235,237,.68);border-color:rgba(28,33,36,.16)}
+.scene[data-theme="light"] .cover-card{background:#D8DDE0;border-color:rgba(28,33,36,.18)}
+.scene[data-theme="light"] .theme-toggle{border-color:rgba(28,33,36,.18)}
+.scene[data-theme="light"] .wordmark{color:rgba(28,33,36,.64)}
+.scene[data-theme="light"] .row{color:rgba(28,33,36,.58)}
+.scene[data-theme="light"] .row.focus{color:var(--ink)}
+.scene[data-theme="light"] .row .meta{color:var(--muted)}
+.scene[data-theme="light"] .row .mark{border-color:rgba(28,33,36,.28)}
+.scene[data-theme="light"] .menu-panel{background:#E6EBED;border-color:rgba(28,33,36,.16);box-shadow:0 24px 70px rgba(25,37,28,.16)}
+.scene[data-theme="light"] .menu-item{color:var(--ink)}
+.scene[data-theme="light"] .menu-item.focus{background:var(--focus);color:#E6EBED}
+.scene[data-theme="light"] .overlay{background:rgba(28,33,36,.34)}

@@ -5,7 +5,7 @@ var APP = 'com.gathin.tvhome';
 var ALLOWED = ['com.gathin.tvhome', 'com.webos.app.home'];
 var appDir = '/media/developer/apps/usr/palm/applications/' + APP;
 var cacheDir = path.join(appDir, 'content-cache');
-var providers = {}, active = false, retries = {}, imageJobs = new Map();
+var providers = {}, active = false, retries = {}, imageJobs = new Map(), refreshTimer = null;
 var nativeSources = {
   'com.biliwebos.app': ['哔哩哔哩公开热门', bili],
   'youtube.leanback.v4': ['YouTube · NASA 频道更新', youtube],
@@ -184,11 +184,11 @@ function syncApps(apps) {
   apps.forEach(function (app) {
     var def;
     if (nativeSources[app.id]) {
-      def = { cacheKey: app.id, ttl: 3600000, enabled: true, fetch: nativeSources[app.id][1], meta: { label: nativeSources[app.id][0], sourceActionLabel: nativeActions[app.id], credits: app.id === 'netflix' ? [{ name: 'TVmaze', url: 'https://www.tvmaze.com/' }] : [] } };
+      def = { cacheKey: app.id, ttl: 900000, enabled: true, fetch: nativeSources[app.id][1], meta: { label: nativeSources[app.id][0], sourceActionLabel: nativeActions[app.id], credits: app.id === 'netflix' ? [{ name: 'TVmaze', url: 'https://www.tvmaze.com/' }] : [] } };
     } else {
       var platform = tmdb.resolve(app);
       if (!platform) return;
-      def = { revision: revision, cacheKey: app.id + '.tmdb.' + config.region + '.' + config.language, ttl: 21600000, enabled: config.configured,
+      def = { revision: revision, cacheKey: app.id + '.tmdb.' + config.region + '.' + config.language, ttl: 1800000, enabled: config.configured,
         fetch: function () { return tmdb.fetch(platform.key); },
         meta: { label: platform.label + ' · ' + (config.region === 'US' ? '美国' : config.region) + '片库精选', sourceActionLabel: '查看作品资料',
           region: config.region, language: config.language, sourceLabel: 'TMDB / JustWatch', configured: config.configured,
@@ -200,6 +200,13 @@ function syncApps(apps) {
   });
   Object.keys(providers).forEach(function (id) { if (!next[id]) { delete providers[id]; delete retries[id]; } });
   definitions = next;
+}
+function scheduleRefresh() {
+  if (refreshTimer) return;
+  // Keep the public cover feeds fresh even when the launcher is not polling.
+  refreshTimer = setInterval(function () {
+    if (!active && Object.keys(definitions).length) refresh(false);
+  }, 5 * 60 * 1000);
 }
 function refresh(force) {
   if (active) return;
@@ -237,7 +244,7 @@ exports.register = function (service) {
       if (!app || typeof app.id !== 'string' || !/^[a-zA-Z0-9_.-]{1,128}$/.test(app.id) || typeof app.title !== 'string' || app.title.length > 200 || seen.has(app.id)) return false;
       seen.add(app.id); return true;
     });
-    syncApps(apps); refresh(payload.refresh === true);
+    syncApps(apps); scheduleRefresh(); refresh(payload.refresh === true);
     message.respond({ returnValue: true, version: 2, refreshing: active, providers: providers });
   });
 };

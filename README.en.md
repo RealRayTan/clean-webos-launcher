@@ -4,7 +4,7 @@
 
 A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, and shared launcher state added here. Current source and tested version: **1.5.0**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, and shared launcher state added here. Current source and tested version: **1.5.1**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 
@@ -18,7 +18,7 @@ To restore LG stock Home temporarily, run `tools/desktop_mode.py off`; run `on` 
 
 | LG stock home | Custom desktop |
 |---|---|
-| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![System-home poster-list desktop with the app list and a Bilibili cover](docs/images/poster-home-1.5.0.png)](docs/images/poster-home-1.5.0.png) |
+| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![System-home poster-list desktop with the app list and a Bilibili cover](docs/images/poster-home-1.5.1.png)](docs/images/poster-home-1.5.1.png) |
 
 The left side is a vertical list of the computer input and favourite apps. The focused app gets a dynamic cover:
 
@@ -33,7 +33,7 @@ Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearanc
 
 Short Back stays with the app. When an app consumes Back and will not exit, holding Back for about 0.7 seconds returns to the desktop without breaking short in-app navigation.
 
-The screenshots show layout only. Results for button interception and standby recovery are in the [verification record](docs/verification.md).
+The screenshots show layout only. System Home, the cold-stone light palette, button interception, and standby recovery results are in the [verification record](docs/verification.md).
 
 ## Home button and standby behavior
 
@@ -74,7 +74,7 @@ Known limitations:
 
 ## Dynamic cover sources
 
-The TV fetches public data asynchronously to build covers and titles. It does not read personal accounts or watch history.
+The TV fetches public data asynchronously to build covers and titles. It does not read personal accounts or watch history. The service checks every 5 minutes, public sources cache for 15 minutes, and TMDB catalogs for 30 minutes; the desktop reads the result every 60 seconds, and manual **Refresh public content** remains available.
 
 | Cover app | Source | Notes |
 |---|---|---|

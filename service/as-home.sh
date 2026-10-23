@@ -11,7 +11,13 @@ LOG=/tmp/gathin-home-as-home.log
 NODE=/usr/bin/node
 
 [ -f "$SRC/index.html" ] || { echo "launcher not installed; leaving LG Home alone" >"$LOG"; exit 0; }
-if grep -q " $DST " /proc/mounts; then echo "already mounted" >"$LOG"; exit 0; fi
+if grep -q " $DST " /proc/mounts; then
+  OLD=$("$NODE" -e 'try{process.stdout.write(require(process.argv[1]).version)}catch(e){}' "$TMP/appinfo.json" 2>/dev/null || true)
+  NEW=$("$NODE" -e 'try{process.stdout.write(require(process.argv[1]).version)}catch(e){}' "$SRC/appinfo.json" 2>/dev/null || true)
+  if [ "$OLD" = "$NEW" ]; then echo "already mounted" >"$LOG"; exit 0; fi
+  umount -l "$DST" 2>/dev/null || true
+  umount -l "$SRC/appinfo.json" 2>/dev/null || true
+fi
 
 rm -rf "$TMP"
 mkdir -p "$TMP"
