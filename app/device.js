@@ -29,6 +29,8 @@
     publicContent: function (refresh, apps, done) { call('luna://com.gathin.tvhome.service/publicContent', { refresh: refresh, apps: apps }, done); },
     listApps: function (done) { call('luna://com.gathin.tvhome.service/listApps', {}, done); },
     vpnStatus: function (done) { call('luna://com.gathin.tvhome.service/vpnStatus', {}, done); },
+    loadState: function (done) { call('luna://com.gathin.tvhome.service/loadState', {}, done); },
+    saveState: function (state, done) { call('luna://com.gathin.tvhome.service/saveState', { state: state }, done || function () {}); },
     launch: function (id, params, done) { call('luna://com.webos.applicationManager/launch', { id: id, params: params || {} }, done); }
   };
 }());

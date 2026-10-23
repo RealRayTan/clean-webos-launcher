@@ -2,6 +2,7 @@
 // Public catalog cache. No account cookies, tokens or arbitrary request URLs.
 var fs = require('fs'), path = require('path'), https = require('https'), crypto = require('crypto');
 var APP = 'com.gathin.tvhome';
+var ALLOWED = ['com.gathin.tvhome', 'com.webos.app.home'];
 var appDir = '/media/developer/apps/usr/palm/applications/' + APP;
 var cacheDir = path.join(appDir, 'content-cache');
 var providers = {}, active = false, retries = {}, imageJobs = new Map();
@@ -228,7 +229,7 @@ exports.register = function (service) {
   fs.mkdirSync(cacheDir, { recursive: true });
   tmdb = require('./tmdb').create({ configPath: '/var/lib/lg-c5-home/tmdb.json', request: request, image: image });
   service.register('publicContent', function (message) {
-    if (message.sender !== APP) return message.respond({ returnValue: false, errorText: 'Caller not allowed' });
+    if (ALLOWED.indexOf(message.sender) < 0) return message.respond({ returnValue: false, errorText: 'Caller not allowed' });
     var payload = message.payload || {};
     if (!Array.isArray(payload.apps) || payload.apps.length > 200) return message.respond({ returnValue: false, errorText: 'Invalid application catalog' });
     var seen = new Set();

@@ -87,3 +87,15 @@ Chrome 使用本地验证服务读取此前保存的四路公开缓存，确认�
 同日实际安装 1.3.0，应用和服务共 59 个文件的摘要与本地一致。Prime Video 的美国片库返回八条并在电视上缓存封面；Disney 与 HBO 各返回八条元数据。后两者未安装到电视，因此没有宣称完成对应 App 的显示或播放验收。用户当前六个首页应用及其顺序保留。GitHub 检查运行见 https://github.com/RealRayTan/lg-webos-desktop/actions/runs/39645687477 。
 
 Prime 动态封面已在 LG C5 实机显示并截图，首页保留六个应用和原顺序；确认后恢复操作前的哔哩哔哩。期间未重启电视、未重复 Home 长短按验证。
+
+## 1.5.0 系统 Home 与长按返回
+
+2026-10-23 在 LG C5 上先备份应用、服务、`/var/lib/lg-c5-home`、键位和 LG 原厂 Home 的 appinfo，再安装 1.5.0。安装脚本把桌面挂成系统 Home，`sam` 重启后挂载生效。
+
+状态同步检查：安装前的首页应用为哔哩哔哩、PlxNative、Apple TV、YouTube、Netflix、Prime Video，主题为自动；安装后的 `/var/lib/lg-c5-home/app-state.json` 保留了同一组应用和最后焦点 YouTube。系统 Home 截图确认左侧列表和 B 站封面正常。
+
+哔哩哔哩退出：通过遥控协议打开 B 站，连续返回进入应用自己的“是否退出应用”确认框，确认后前台为 `com.webos.app.home`，没有经过 LG 原厂首页；截图 `docs/images/poster-home-1.5.0.png` 为退出后的系统 Home。此次确认的是 B 站退出目标，不是新的 Home 键长短按验收。
+
+长按返回已接入服务，阈值约 650 毫秒，且只在前台为内容应用时触发。当前使用的遥控协议只能发送短按，不能保持按键；因此长按返回尚未做物理验收。后续需要在 YouTube 或 Alcyone 上按住返回一次，并检查是否回到系统 Home、短按返回是否仍留在应用内。
+
+`desktop_mode.py off` 的卸载与恢复路径、开机后的自动挂载、完整冷启动以及长按返回都还需要实机确认。原始备份和截图只保留在本机，不进入公开仓库。

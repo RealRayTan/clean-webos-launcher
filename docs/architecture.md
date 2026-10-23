@@ -42,9 +42,21 @@ flowchart LR
 
 电脑只用于配对、打包、安装和维护。按键、租约与界面恢复都在电视端运行。1.0.9 的 root 助手通过 listLaunchPoints 获取可启动应用，将本地图标转换为图片数据返回前端。桌面首次加载、再次打开或手动刷新时更新列表，读取失败则保留缓存和打包时清单。隐藏选择和排序分别保存在前端 localStorage 中。
 
-## 应用退出后的返回来源
+## 1.5.0 系统 Home
 
-`service/return-origin.js` 在新桌面直接切入内容应用时记录来源。只有这个应用随后退出到 LG 首页，且电视仍为活动状态时，才打开新桌面。来源由前台转换推断，不改第三方应用；无关应用切换会取消记录。
+系统 Home 模式把已安装的桌面复制到内存，修改副本的 `appid` 为 `com.webos.app.home`，再用 bind mount 覆盖 LG 原厂 Home 目录，重启应用管理器 `sam`。这样 webOS 原本要打开原厂 Home 的所有路径都会打开桌面，应用退出不再需要事后拉回，也不会先显示原厂 Home。
+
+`service/as-home.sh` 只在 `/media/developer/apps/.../com.gathin.tvhome` 存在时工作；它同时隐藏普通桌面入口、恢复原 Home 键位、删除旧的原生 Home 标记、创建 `/var/lib/lg-c5-home/system-home`、重启 `sam`、启动桌面服务，并设置启动输入。所有改动都在内存挂载和 `/var/lib/lg-c5-home` 中，LG 原厂 Home 文件不变。
+
+系统 Home 副本和普通应用使用同一个内容缓存目录，并允许两者调用 `publicContent`、`vpnStatus` 和 `app-state`。`service/app-state.js` 保存首页应用、顺序、主题、背景和最后焦点；安装时普通应用先启动一次把旧 localStorage 写入状态文件，Home 副本首次启动读取它。
+
+`service/service.js` 在系统 Home 模式下让 Home 键走 webOS 原生路径，不再启动旧助手。返回键事件仍被非阻塞读取：短按不处理，长按约 650 毫秒且前台是内容应用时，启动系统 Home。`return-origin` 在该模式下停用，`resume-state` 的桌面目标改为 `com.webos.app.home`。
+
+`tools/desktop_mode.py off` 卸载两个 bind mount、移除系统 Home 标记和启动钩子、恢复键位并重启 `sam`，然后打开原厂 Home；`on` 重新执行挂载脚本。
+
+## 旧版 Home 接管与返回来源
+
+1.4.x 及以前的模式使用 `service/return-origin.js`：在新桌面直接切入内容应用时记录来源，应用退出到 LG 首页后再打开新桌面。来源由前台转换推断，不改第三方应用；无关应用切换会取消记录。该机制只能修正最终目标，不能保证退出过渡没有原厂首页画面；系统 Home 模式不再使用它。
 
 主动长按 Home 会在打开原厂首页前取消记录，因此不会被新桌面立即拉回。原厂首页进入的应用没有新桌面来源，仍由系统处理退出。电源确认只在需要返回时请求，有 1.5 秒期限；失效回复不再启动桌面。此机制修正最终返回目标，不保证应用退出过渡没有原厂首页画面。
 

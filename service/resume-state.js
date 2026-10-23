@@ -1,7 +1,7 @@
 'use strict';
-exports.start = function (service, fs, launch, log, enabled) {
+exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
   var file = '/var/lib/lg-c5-home/last-screen.json';
-  var desktop = 'com.gathin.tvhome';
+  var desktop = typeof isSystemHome === 'function' && isSystemHome() ? 'com.webos.app.home' : 'com.gathin.tvhome';
   var saved = null, committed = null, foreground = null, writes = 0;
   var phase = 'boot', powerRequest = null, operation = null, attempts = 0;
   try { saved = committed = JSON.parse(fs.readFileSync(file, 'utf8')).appId; } catch (error) {}

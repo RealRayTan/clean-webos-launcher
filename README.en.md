@@ -2,21 +2,23 @@
 
 [简体中文](README.md) | **English**
 
-A poster-list Chinese launcher for rooted LG webOS TVs. It takes over the remote Home button and restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
+A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, and standby recovery added here. Current source and tested version: **1.4.1**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, and shared launcher state added here. Current source and tested version: **1.5.0**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 
 The TV must be rooted, with Homebrew Channel installed and SSH key login configured. This repository does not provide root tools or third-party binaries. Follow [installation and deployment](docs/install.md) to sync apps, prepare native dependencies, and package the launcher. Disabling works from the same page.
 
-A rooted TV installs over **root SSH on port 22**, not the webOS Developer Mode port 9922. After installation, press Home once to open the desktop.
+A rooted TV installs over **root SSH on port 22**, not the webOS Developer Mode port 9922. The installer mounts the launcher as the system Home and syncs the launcher state into the Home copy. A short Home press or an app exit lands directly on the desktop.
+
+To restore LG stock Home temporarily, run `tools/desktop_mode.py off`; run `on` to re-enable. Disabling removes only the mount and startup hook; apps and root stay installed.
 
 ## Interface
 
 | LG stock home | Custom desktop |
 |---|---|
-| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![Poster-list desktop with the app list and a Bilibili cover](docs/images/poster-home-1.4.1.png)](docs/images/poster-home-1.4.1.png) |
+| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![System-home poster-list desktop with the app list and a Bilibili cover](docs/images/poster-home-1.5.0.png)](docs/images/poster-home-1.5.0.png) |
 
 The left side is a vertical list of the computer input and favourite apps. The focused app gets a dynamic cover:
 
@@ -27,7 +29,9 @@ The left side is a vertical list of the computer input and favourite apps. The f
 - Themes are auto, dark, and light. In light mode the clock and caption use a translucent paper surface.
 - Wallpapers are a valley, misty mountains, or a solid color. The theme switches on local TV time at 07:00 and 19:00, or can be locked in settings.
 
-Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearance holds theme and wallpaper, Desktop holds home apps and content sources, and System opens LG settings. Theme, wallpaper, home apps, and order are stored on the TV, and upgrades inherit the previous settings.
+Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearance holds theme and wallpaper, Desktop holds home apps and content sources, and System opens LG settings. Theme, wallpaper, home apps, and order are stored on the TV; the normal app and the system-home copy share them through a TV-side state file.
+
+Short Back stays with the app. When an app consumes Back and will not exit, holding Back for about 0.7 seconds returns to the desktop without breaking short in-app navigation.
 
 The screenshots show layout only. Results for button interception and standby recovery are in the [verification record](docs/verification.md).
 
@@ -35,14 +39,16 @@ The screenshots show layout only. Results for button interception and standby re
 
 | Action | Result |
 |---|---|
-| Short press Home | Open the custom desktop |
-| Hold Home for about 1 second, then release | Open LG stock home |
+| Short press Home | Open the system-home custom desktop |
+| Hold Home | Use the system Home long-press path; while enabled, the stock LG Home is masked by the mount |
 | Shut down from the desktop, then power on (wake from standby) | Restore the custom desktop |
 | Shut down from HDMI, then power on | LG keeps the last input |
-| Exit an app launched from the desktop | Return to the desktop (verified with Bilibili) |
-| Exit an app launched from LG stock home | Keep the stock return behavior |
+| Exit an app launched from the desktop | Return directly to the custom desktop, without a stock-Home frame |
+| Back does not exit inside an app | Hold Back for about 0.7 seconds to return to the custom desktop |
+| Short Back inside an app | Keep the app's own back navigation |
+| Disable the desktop (`desktop_mode.py off`) | Unmount the system Home and restore LG stock Home |
 
-Back-button behavior inside third-party apps is up to each app. YouTube AdFree and Alcyone show no exit confirmation at the top level, so a short Home press returns to the desktop. Leaving the Alcyone screen does not disconnect the VPN tunnel.
+Bilibili shows its own exit confirmation; confirming it returns directly to the custom desktop. YouTube AdFree and Alcyone consume short Back at the top level, so use long Back or Home to leave. Leaving the Alcyone screen does not disconnect the VPN tunnel.
 
 ## Manage apps
 
@@ -58,7 +64,8 @@ The kernel is aarch64, but input interception and the user-space dependencies ru
 
 Known limitations:
 
-- Holding Home for more than 6 seconds is not handled yet.
+- The system Home is a bind mount over LG's Home, not a change to the system partition. While enabled, LG stock Home is not directly reachable; run `tools/desktop_mode.py off` to restore it.
+- Long Back is fixed at about 0.7 seconds. Short Back remains entirely owned by the third-party app.
 - The TV-side button helper has no supervisor to restart it after a crash.
 - Playback position inside third-party streaming apps is not restored.
 - Standby recovery is verified on the TV; a full cold boot is not.

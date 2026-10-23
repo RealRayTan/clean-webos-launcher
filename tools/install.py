@@ -3,6 +3,7 @@ import json
 import os
 import shlex
 import subprocess
+import time
 from tv_control import ROOT, call, remote, ssh_args
 
 version = json.loads((ROOT / 'app/appinfo.json').read_text())['version']
@@ -37,21 +38,19 @@ except subprocess.TimeoutExpired:
 if b'"state": "installed"' not in output:
     raise RuntimeError((output + error).decode(errors='replace'))
 checked('/media/developer/apps/usr/palm/services/org.webosbrew.hbchannel.service/elevate-service com.gathin.tvhome.service')
-configure = '''var fs=require('fs');
-var base='/home/root/.config/lginputhook',file=base+'/keybinds.json';
-fs.mkdirSync(base,{recursive:true});
-var config={};
-if(fs.existsSync(file)){
-  config=JSON.parse(fs.readFileSync(file,'utf8'));
-  if(!fs.existsSync('/var/lib/lg-c5-home/keybinds.before.json'))fs.copyFileSync(file,'/var/lib/lg-c5-home/keybinds.before.json');
-}
-config['773']={action:'timed_ignore'};
-fs.writeFileSync(file,JSON.stringify(config));'''
-checked('mkdir -p /var/lib/lg-c5-home; node -e ' + shlex.quote(configure))
-call('luna://com.webos.settingsservice/setSystemSettings', {'category': 'general', 'settings': {'homeAutoLaunch': 'off'}})
+
+# The regular app still has the user's localStorage. Launch it once so the new
+# shared-state service receives that state before the system-home copy loads.
+try:
+    call('luna://com.webos.applicationManager/launch', {'id': 'com.gathin.tvhome'}, timeout=8)
+    time.sleep(2)
+except (RuntimeError, subprocess.TimeoutExpired, TimeoutError) as error:
+    print('State sync launch unavailable:', error)
+
+# Mount the app as LG's Home and keep the normal app entry hidden. The script
+# restores the native Home key path, disables the old helper, and restarts sam.
 checked('mkdir -p /var/lib/webosbrew/init.d; '
         'rm -f /var/lib/lg-c5-home/disabled; '
-        'touch /var/lib/lg-c5-home/native-enabled; '
-        'ln -sf /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh /var/lib/webosbrew/init.d/60-lg-c5-home; '
-        'sh /var/lib/webosbrew/init.d/60-lg-c5-home')
-print('Installed. Check Home behavior and the shutdown-screen setting once on your TV.')
+        'ln -sf /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/as-home.sh /var/lib/webosbrew/init.d/40-gathin-as-home; '
+        'sh /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/as-home.sh')
+print('Installed as system Home. Check Home, Back from an app, and the shutdown-screen setting once on your TV.')

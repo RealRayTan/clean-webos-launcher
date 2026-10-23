@@ -6,11 +6,16 @@ var service = new Service('com.gathin.tvhome.service');
 var APP = 'com.gathin.tvhome';
 var LOG = '/tmp/lg-c5-home.log';
 var disabled = '/var/lib/lg-c5-home/disabled';
+var systemHome = '/var/lib/lg-c5-home/system-home';
 var lastLaunch = 0;
-var keyDown = 0;
+var keyDown = 0, backDown = 0, backTimer = 0;
 var inputFiles = [];
+function isSystemHome() { return fs.existsSync(systemHome); }
+function target() { return isSystemHome() ? 'com.webos.app.home' : APP; }
 function handleHome(code, value, source) {
   if (code !== 773 && code !== 102) return;
+  // With the custom app mounted as the system home, leave Home to webOS.
+  if (isSystemHome()) return;
   log('home event ' + source + ' code=' + code + ' value=' + value);
   if (keyDown && Date.now() - keyDown > 6000) keyDown = 0;
   if (value === 1 && !keyDown) keyDown = Date.now();
@@ -23,6 +28,31 @@ function handleHome(code, value, source) {
     } else log('home-hold: leave native Home');
   }
 }
+function handleBack(value, source) {
+  if (value === 1 && !backDown) {
+    backDown = Date.now();
+    clearTimeout(backTimer);
+    backTimer = setTimeout(function () {
+      if (!backDown || Date.now() - backDown < 650) return;
+      backDown = 0;
+      service.call('luna://com.webos.applicationManager/getForegroundAppInfo', {}, function (response) {
+        var payload = response && response.payload;
+        if (!enabled() || !payload || payload.returnValue !== true) return;
+        var id = payload.appId;
+        if (!id || id === 'com.webos.app.home' || id === APP || id === 'com.palm.app.settings' ||
+            id === 'com.webos.app.settings' || /^com\.webos\.app\.(hdmi[1-4]|livetv)$/.test(id)) return;
+        log('back-hold: ' + id);
+        launch('back-hold');
+      });
+    }, 650);
+  } else if (value === 0 && backDown) {
+    clearTimeout(backTimer); backTimer = 0; backDown = 0;
+  }
+}
+function handleKey(code, value, source) {
+  if (code === 158) { handleBack(value, source); return; }
+  handleHome(code, value, source);
+}
 function log(message) { fs.appendFileSync(LOG, new Date().toISOString() + ' ' + message + '\n'); }
 function enabled() { return !fs.existsSync(disabled); }
 function launch(reason, done) {
@@ -30,7 +60,7 @@ function launch(reason, done) {
   lastLaunch = Date.now();
   var finished = false;
   var timeout = setTimeout(function () { if (!finished) { finished = true; log(reason + ': timeout'); if (done) done(false); } }, 4000);
-  service.call('luna://com.webos.applicationManager/launch', { id: APP }, function (response) {
+  service.call('luna://com.webos.applicationManager/launch', { id: target() }, function (response) {
     if (finished) return;
     finished = true; clearTimeout(timeout);
     var result = response && response.payload;
@@ -39,10 +69,11 @@ function launch(reason, done) {
   });
 }
 service.register('status', function (message) {
-  message.respond({ returnValue: true, pid: process.pid, root: process.getuid() === 0, enabled: enabled(), inputDevices: inputFiles.length, startupMode: 'remember-desktop-or-input', resume: resumeStatus(), returnOrigin: returnOrigin.status() });
+  message.respond({ returnValue: true, pid: process.pid, root: process.getuid() === 0, enabled: enabled(), mode: isSystemHome() ? 'system-home' : 'helper-home', target: target(), inputDevices: inputFiles.length, startupMode: 'remember-desktop-or-input', resume: resumeStatus(), returnOrigin: returnOrigin.status() });
 });
 service.register('open', function (message) { launch('requested'); message.respond({ returnValue: true }); });
 require('./app-catalog').register(service);
+require('./app-state').register(service);
 try { require('./public-content').register(service); } catch (error) { log('content unavailable: ' + error.message); }
 
 // Read events without grabbing them: every native button remains available.
@@ -64,7 +95,7 @@ function readInputs() {
         if (buffer.readUInt16LE(offset + typeOffset) !== 1) continue;
         var code = buffer.readUInt16LE(offset + typeOffset + 2);
         var value = buffer.readInt32LE(offset + typeOffset + 4);
-        handleHome(code, value, device.name);
+        handleKey(code, value, device.name);
       }
     });
   }, 50);
@@ -74,6 +105,6 @@ log('start pid=' + process.pid + ' root=' + (process.getuid() === 0));
 readInputs();
 try { require('./native-home').start(handleHome, log); } catch (error) { log('native fallback: ' + error.message); }
 
-var resumeStatus = require('./resume-state').start(service, fs, launch, log, enabled);
+var resumeStatus = require('./resume-state').start(service, fs, launch, log, enabled, isSystemHome);
 
-var returnOrigin = require('./return-origin').start(service, launch, enabled, function () { return resumeStatus().phase === 'active'; }, log);
+var returnOrigin = require('./return-origin').start(service, launch, enabled, function () { return resumeStatus().phase === 'active'; }, log, isSystemHome);

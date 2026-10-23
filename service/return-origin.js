@@ -1,5 +1,9 @@
 'use strict';
-exports.start = function (service, launch, enabled, active, log) {
+exports.start = function (service, launch, enabled, active, log, isSystemHome) {
+  // The system-home copy already owns the exit destination; relaunching here would duplicate it.
+  if (typeof isSystemHome === 'function' && isSystemHome()) {
+    return { cancel: function () {}, status: function () { return { app: null }; } };
+  }
   var desktop = 'com.gathin.tvhome', nativeHome = 'com.webos.app.home';
   var foreground = null, session = null;
   function cancel() {

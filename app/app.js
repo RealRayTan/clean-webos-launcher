@@ -20,7 +20,8 @@
     'com.apple.appletv': { name: 'Apple TV', icon: 'appletv.svg', style: 'apple' },
     amazon: { name: 'Prime Video', style: 'prime' },
     'com.alcyone.vpn.singbox': { name: 'Alcyone', subtitle: 'VPN', style: 'alcyone' },
-    'org.webosbrew.hbchannel': { name: 'Homebrew', subtitle: 'Channel', style: 'homebrew' }
+    'org.webosbrew.hbchannel': { name: 'Homebrew', subtitle: 'Channel', style: 'homebrew' },
+    'com.webos.app.home': { name: '桌面', subtitle: '主屏幕', style: 'generic' }
   };
   var contentHints = {
     'com.biliwebos.app': '正在读取公开热门',
@@ -41,9 +42,11 @@
   var catalog = sanitizeApps(window.TV_APPS && TV_APPS.apps);
   try { var cached = sanitizeApps(JSON.parse(localStorage.getItem('tvhome.catalog'))); if (cached.length) catalog = cached; } catch (error) {}
   var state = { theme: 'auto', wallpaper: 'valley', apps: defaults.slice(), lastFocus: 'computer' };
+  var hasLocalState = false;
   try {
     var saved = JSON.parse(localStorage.getItem(KEY));
     if (saved && ['auto', 'light', 'dark'].indexOf(saved.theme) >= 0 && ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) >= 0 && Array.isArray(saved.apps)) {
+      hasLocalState = true;
       state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: saved.apps.filter(function (id, i, all) { return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i; }), lastFocus: saved.lastFocus || 'computer' };
     } else {
       var hidden = JSON.parse(localStorage.getItem('tvhome.hidden'));
@@ -71,7 +74,20 @@
     try { localStorage.setItem(KEY, JSON.stringify(next)); }
     catch (error) { toast('保存失败，已保留原来的设置'); return false; }
     state = next;
+    if (window.TVDevice && TVDevice.saveState) TVDevice.saveState(state);
     return true;
+  }
+  function adoptState(saved) {
+    if (!saved || ['auto', 'light', 'dark'].indexOf(saved.theme) < 0 ||
+        ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) < 0 || !Array.isArray(saved.apps)) return;
+    var apps = saved.apps.filter(function (id, i, all) {
+      return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i;
+    });
+    state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: apps,
+      lastFocus: typeof saved.lastFocus === 'string' ? saved.lastFocus : 'computer' };
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (error) {}
+    hasLocalState = true;
+    appearance(); renderList(state.lastFocus);
   }
   function installed(id) { return catalog.filter(function (app) { return app.id === id; })[0]; }
   function appInfo(id) {
@@ -570,6 +586,12 @@
   frontIndex = 0; frontImage = 'assets/valley.jpg';
   appearance(); renderList(state.lastFocus); fit(); clock(); updateZones();
   refreshApps(false); refreshVpn();
+  if (window.TVDevice && TVDevice.loadState) {
+    TVDevice.loadState(function (result) {
+      if (!hasLocalState && result && result.returnValue && result.state) adoptState(result.state);
+      else if (TVDevice.saveState) TVDevice.saveState(state);
+    });
+  }
   if (window.PublicContent) {
     PublicContent.subscribe(function () { preloadCovers(); updateCover(); });
     PublicContent.start();

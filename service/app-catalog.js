@@ -14,7 +14,7 @@ function iconData(file) {
 
 exports.register = function (service) {
   service.register('vpnStatus', function (message) {
-    if (message.sender !== 'com.gathin.tvhome') {
+    if (['com.gathin.tvhome', 'com.webos.app.home'].indexOf(message.sender) < 0) {
       message.respond({ returnValue: false, errorText: 'Caller not allowed' });
       return;
     }
@@ -57,7 +57,7 @@ exports.register = function (service) {
           icon: iconData(point.largeIcon) || iconData(point.icon),
           iconColor: point.iconColor || point.bgColor || '' };
       });
-      if (!seen['com.webos.app.home']) apps.push({ id: 'com.webos.app.home', title: 'LG 原厂首页', icon: 'icons/lg-home.svg', iconColor: '#303038' });
+      if (!seen['com.webos.app.home']) apps.push({ id: 'com.webos.app.home', title: '桌面', icon: 'icons/lg-home.svg', iconColor: '#303038' });
       finish({ returnValue: true, apps: apps });
     });
   });
