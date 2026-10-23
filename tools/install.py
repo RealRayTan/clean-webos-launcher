@@ -70,6 +70,10 @@ checked('mkdir -p /var/lib/webosbrew/init.d; '
         'ln -sf /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/as-home.sh /var/lib/webosbrew/init.d/40-gathin-as-home; '
         'sh /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/as-home.sh')
 try:
+    call('luna://com.webos.applicationManager/launch', {'id': 'com.webos.app.home'}, timeout=8)
+except (RuntimeError, subprocess.TimeoutExpired, TimeoutError):
+    pass
+try:
     call('luna://com.gathin.tvhome.service/closeApp',
          {'id': 'com.webos.app.screensaver'}, timeout=3)
 except (RuntimeError, subprocess.TimeoutExpired, TimeoutError, KeyError, ValueError):

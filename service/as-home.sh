@@ -79,7 +79,7 @@ if [ ! -f "$ORIG" ]; then
     '{"category":"general","keys":["lastInputApp","physicalLastInputApp","homeAutoLaunch"]}' >"$ORIG" 2>/dev/null || true
 fi
 luna-send -n 1 -w 5000 luna://com.webos.settingsservice/setSystemSettings \
-  '{"category":"general","settings":{"lastInputApp":"com.gathin.tvhome","physicalLastInputApp":"com.gathin.tvhome","homeAutoLaunch":"off"}}' >/dev/null 2>&1 \
+  '{"category":"general","settings":{"lastInputApp":"com.webos.app.home","physicalLastInputApp":"com.webos.app.home","homeAutoLaunch":"off"}}' >/dev/null 2>&1 \
   && echo "boot input set to launcher" >>"$LOG"
 echo "launcher mounted as system Home" >>"$LOG"
 exit 0
