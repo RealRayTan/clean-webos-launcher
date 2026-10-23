@@ -26,6 +26,13 @@
 
     <div class="wordmark">我的空间</div>
     <div class="top-right">
+      <div id="weather" class="weather-widget" title="本地天气与日落" aria-label="本地天气">
+        <span id="weatherIcon" class="weather-icon">☀️</span>
+        <div class="weather-meta">
+          <span id="weatherTemp" class="weather-temp">--°</span>
+          <span id="weatherDesc" class="weather-desc">晴朗</span>
+        </div>
+      </div>
       <button id="theme" class="theme-toggle" type="button" data-key="theme" aria-label="切换浅色主题">
         <img class="theme-icon theme-icon-sun" src="assets/sun.svg" alt="">
         <img class="theme-icon theme-icon-moon" src="assets/moon.svg" alt="">
@@ -62,6 +69,7 @@
   <script src="apps.js"></script>
   <script src="device.js"></script>
   <script src="theme.js"></script>
+  <script src="weather.js"></script>
   <script src="content.js"></script>
   <script src="app.js"></script>
 </body>

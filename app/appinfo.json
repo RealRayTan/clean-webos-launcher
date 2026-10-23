@@ -12,6 +12,8 @@
   "resolution": "1920x1080",
   "disableBackHistoryAPI": true,
   "noSplashOnLaunch": true,
+  "supportQuickStart": true,
+  "handlesRelaunch": true,
   "requiredACG": [
     "application.launcher",
     "network.query"

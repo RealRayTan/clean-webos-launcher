@@ -7,6 +7,8 @@
   var panelButtons = Array.prototype.slice.call(panelEl.querySelectorAll('.menu-item'));
   var layers = [$('layerA'), $('layerB')], backgrounds = [$('bgA'), $('bgB')], cards = [$('cardA'), $('cardB')];
   var clockEl = $('clock'), dateEl = $('date'), captionTitle = $('captionTitle'), captionText = $('captionText');
+  var weatherIconEl = $('weatherIcon'), weatherTempEl = $('weatherTemp'), weatherDescEl = $('weatherDesc');
+  var currentWeather = (typeof window !== 'undefined' && window.TVWeather) ? TVWeather.getCache() : null;
   var focusLine = null;
   var KEY = 'tvhome.tiles.v1';
   var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
@@ -124,10 +126,24 @@
     scene.style.top = ((window.innerHeight - reserve - 1080 * scale) / 2) + 'px';
   }
   function appearance() {
-    var effective = FrameTheme.resolve(state.theme, new Date().getHours());
+    var effective = FrameTheme.resolve(state.theme, new Date().getHours(), currentWeather);
     scene.dataset.theme = effective; scene.dataset.wallpaper = state.wallpaper;
     var darkLike = effective === 'dark' || effective === 'oled';
-    $('theme').setAttribute('aria-label', (darkLike ? '切换浅色主题' : '切换深色主题') + (state.theme === 'auto' ? '，当前按时间自动切换' : ''));
+    $('theme').setAttribute('aria-label', (darkLike ? '切换浅色主题' : '切换深色主题') + (state.theme === 'auto' ? '，当前按时间与日落自动切换' : ''));
+  }
+  function updateWeatherUI(data) {
+    if (!data) return;
+    currentWeather = data;
+    if (weatherIconEl && data.icon) weatherIconEl.textContent = data.icon;
+    if (weatherTempEl && typeof data.temp === 'number') weatherTempEl.textContent = data.temp + '°';
+    if (weatherDescEl && data.text) weatherDescEl.textContent = data.text;
+    appearance();
+  }
+  function refreshWeather() {
+    if (!window.TVWeather) return;
+    TVWeather.fetchWeather(function (err, data) {
+      if (!err && data) updateWeatherUI(data);
+    });
   }
   function clock() {
     var now = new Date(), h = now.getHours();
@@ -256,13 +272,13 @@
       var item = contentFor(app, 0);
       if (!item || preloads[item.image]) return;
       preloads[item.image] = true;
-      var image = new Image(); image.src = item.image;
+      var image = new Image(); image.decoding = 'async'; image.src = item.image;
       if (image.decode) image.decode().catch(function () {});
     });
     [wallpaperSrc(), 'assets/valley.jpg', 'assets/peaks.jpg'].forEach(function (src) {
       if (preloads[src]) return;
       preloads[src] = true;
-      var image = new Image(); image.src = src;
+      var image = new Image(); image.decoding = 'async'; image.src = src;
       if (image.decode) image.decode().catch(function () {});
     });
   }
@@ -318,6 +334,7 @@
   }
   function loadMedia(layerIndex, cover, id, done) {
     var bg = backgrounds[layerIndex], card = cards[layerIndex], left = 2, failed = false, finished = false;
+    bg.decoding = 'async'; card.decoding = 'async';
     function finish() { if (finished || id !== requestId) return; finished = true; done(card); }
     function settle() { if (failed || id !== requestId) return; if (--left > 0) return; finish(); }
     function fail() {
@@ -703,7 +720,7 @@
     var wanted = state.lastFocus;
     items.forEach(function (item, i) { if (item.id === wanted) index = i; });
     updateList(); updateCover(); updateZones();
-    refreshApps(false); refreshVpn();
+    refreshApps(false); refreshVpn(); refreshWeather();
   }
   function handleParams(raw) {
     try {
@@ -723,9 +740,11 @@
   window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);
 
   backgrounds[0].src = 'assets/valley.jpg'; cards[0].src = 'assets/valley.jpg';
+  backgrounds[0].decoding = 'async'; cards[0].decoding = 'async';
   frontIndex = 0; frontImage = 'assets/valley.jpg';
+  if (currentWeather) updateWeatherUI(currentWeather);
   appearance(); renderList(state.lastFocus); fit(); clock(); updateZones();
-  refreshApps(false); refreshVpn();
+  refreshApps(false); refreshVpn(); refreshWeather();
   if (window.TVDevice && TVDevice.loadState) {
     TVDevice.loadState(function (result) {
       if (!hasLocalState && result && result.returnValue && result.state) adoptState(result.state);
@@ -736,5 +755,5 @@
     PublicContent.subscribe(function () { preloadCovers(); updateCover(); });
     PublicContent.start();
   }
-  setInterval(clock, 10000); setInterval(refreshVpn, 20000);
+  setInterval(clock, 10000); setInterval(refreshVpn, 20000); setInterval(refreshWeather, 30 * 60 * 1000);
 }());
