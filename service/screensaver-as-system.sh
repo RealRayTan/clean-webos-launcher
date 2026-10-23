@@ -24,7 +24,7 @@ cp -a "$SRC/." "$STATE/"
 
 mount --bind "$STATE" "$DST" || { echo "screensaver mount failed" >"$LOG"; exit 0; }
 
-# as-home.sh restarts sam after mounting both apps; a second restart here can
-# block while an HDMI input is foreground.
+# sam caches appinfo.json; restart it so the next launch reads the web app.
+systemctl restart sam >>"$LOG" 2>&1 || true
 echo "screensaver mounted" >>"$LOG"
 exit 0

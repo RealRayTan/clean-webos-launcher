@@ -33,7 +33,7 @@
   var deviceKeys = ['default', 'pc', 'ps5', 'ps4', 'xbox', 'switch', 'media'];
   var devicePresets = {
     default: { name: '', badge: '', color: '' },
-    pc: { name: '电脑', badge: 'PC', color: '#3B82F6', icon: 'device-desktop.svg' },
+    pc: { name: '电脑', badge: 'PC', color: '#3B82F6' },
     ps5: { name: 'PS5', badge: 'PS5', color: '#123CA6' },
     ps4: { name: 'PS4', badge: 'PS4', color: '#173070' },
     xbox: { name: 'Xbox', badge: 'Xbox', color: '#107C10' },
@@ -49,12 +49,7 @@
     return out;
   }
   function deviceInfo(id) {
-    var explicit = state.devices && state.devices[id];
-    if (explicit) return devicePresets[explicit];
-    // The configured computer input is the one device we can infer reliably:
-    // it is the HDMI port the user chose for the PC in config.js.
-    if (id === computer) return devicePresets.pc;
-    return devicePresets.default;
+    return devicePresets[state.devices && state.devices[id]] || devicePresets.default;
   }
   function sanitizeApps(value) {
     if (!Array.isArray(value)) return [];
@@ -148,9 +143,9 @@
     var computerName = preset.name || '电脑';
     var list = [{
       id: computer, name: computerName, meta: 'HDMI 4',
-      icon: preset.icon || (preset.badge ? '' : 'device-desktop.svg'),
-      badge: preset.icon ? '' : preset.badge, badgeColor: preset.color,
-      style: 'computer', desc: preset.name && preset.name !== '电脑' ? '切换到 ' + preset.name + ' 输入源' : '切换到电脑输入源',
+      icon: preset.badge ? '' : 'device-desktop.svg',
+      badge: preset.badge, badgeColor: preset.color,
+      style: 'computer', desc: preset.name ? '切换到 ' + preset.name + ' 输入源' : '切换到电脑输入源',
       fallback: wallpaperSrc()
     }];
     homeIds().forEach(function (id) {
@@ -550,10 +545,7 @@
   }
   function inputDeviceMark(preset) {
     var mark = document.createElement('span');
-    if (preset.icon) {
-      mark.className = 'mark';
-      mark.appendChild(icon(preset.icon));
-    } else if (preset.badge) {
+    if (preset.badge) {
       mark.className = 'mark device-mark';
       mark.textContent = preset.badge;
       if (preset.color) mark.style.color = preset.color;

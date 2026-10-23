@@ -135,13 +135,3 @@ HDMI 标签目前使用文字色标，不引入 FreeMyTV 的品牌 logo 素材�
 1.5.3 的内容服务随后增加 SOCKS5 支持：读取 Alcyone 配置中的 loopback SOCKS 端口，只对 YouTube、Netflix、TMDB 使用代理，B 站和 Apple TV 直连；不读取 Alcyone 的出站节点或凭据。第一次安装后手动强制刷新时，B 站、Apple TV、Netflix、Prime/TMDB 均为 live；YouTube 仍失败，原因是封面缩略图域名 `i.ytimg.com` 没有走代理。把 `ytimg.com` 加入代理域名后重新安装并再次强制刷新，五个来源全部为 live：B 站、Apple TV、Netflix、Prime/TMDB、YouTube 的 `fetchedAt` 均为 12:59，YouTube 首条为 NASA 直播。之前“只有 B 站更新”的直接网络原因由此闭环。
 
 代理不可用时是否保留缓存、5 分钟自动周期在 VPN 下的稳定性尚未单独复验；这次确认的是手动强制刷新和 Alcyone 连接状态。
-
-## 1.5.4 内容来源面板与 HDMI 退出
-
-2026-10-23 在 Chrome 中验证新的“内容来源”面板：顶部 5/5 来源摘要与刷新按钮，中部五行来源（品牌图标、名称、条数、状态点、更新时间），底部来源署名。测试使用本地模拟服务返回 live/cached 状态，不是电视截图；电视端还要按同一布局复验。
-
-HDMI 4 的电脑入口改为由 `config.js` 的 `computerInput` 自动得到“电脑”名称和桌面图标；其他端口的 PS5/PS4/Xbox/Switch/媒体中心仍是手动预设。浏览器中确认 HDMI 4 显示电脑名称和桌面图标，未做硬件设备识别。此前 1.5.2 验证时把 HDMI 1 临时标成 PS5，1.5.4 电视验收前需要清除这个测试标签。
-
-系统 Home 的 HDMI 退出修复已加三组本地回归测试：HDMI 前景短按 Home、HDMI 前景短按返回、内容应用中短按返回不接管。全部 34 项本地检查通过。
-
-电视实机 HDMI 3：此前卡在无信号画面，安装 1.5.4 的助手后按一次 Home 已回到系统 Home 桌面，截图 `hdmi3-home-test.png`。这次确认的是 Home 路径；HDMI 输入中的短按返回还要再操作一次。HDMI 1 的 PS5 测试标签和 HDMI 4 的电脑自动图标仍需在电视端清理/确认。新的内容来源面板目前只有 Chrome 模拟服务截图，电视端未复验。
