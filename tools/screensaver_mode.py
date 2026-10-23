@@ -8,8 +8,8 @@ STATE = '/var/lib/lg-c5-home'
 INIT = '/var/lib/webosbrew/init.d/41-gathin-screensaver'
 
 
-def run(command):
-    result = remote(command)
+def run(command, timeout=20):
+    result = remote(command, timeout=timeout)
     if result.returncode:
         raise RuntimeError(result.stderr.decode())
     return result
@@ -24,7 +24,8 @@ if sys.argv[1:] == ['off']:
     run(
         f'rm -f {INIT}; '
         f'umount -l {DST} 2>/dev/null || true; '
-        'systemctl restart sam || true'
+        'systemctl restart sam || true',
+        timeout=45
     )
     print('System screen saver restored.')
 elif sys.argv[1:] == ['on']:
@@ -36,7 +37,9 @@ elif sys.argv[1:] == ['on']:
     run(
         f'mkdir -p {STATE}; '
         f'ln -sf {SVC}/screensaver-as-system.sh {INIT}; '
-        f'sh {SVC}/screensaver-as-system.sh'
+        f'sh {SVC}/screensaver-as-system.sh; '
+        'systemctl restart sam || true',
+        timeout=45
     )
     print('System screen saver replaced.')
 else:

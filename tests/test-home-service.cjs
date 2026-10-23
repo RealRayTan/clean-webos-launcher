@@ -3,12 +3,13 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
 const source = fs.readFileSync(__dirname + '/../service/service.js', 'utf8');
-function scenario() {
+function scenario(options = {}) {
   let now = 100000, pending = [], events = [], nativeKey;
   const launched = [], methods = {}, intervals = [];
   class FakeDate extends Date { constructor() { super(now); } static now() { return now; } }
   const storage = {
-    constants: { O_RDONLY: 0, O_NONBLOCK: 2048 }, appendFileSync() {}, existsSync() { return false; },
+    constants: { O_RDONLY: 0, O_NONBLOCK: 2048 }, appendFileSync() {},
+    existsSync(file) { return !!options.systemHome && file === '/var/lib/lg-c5-home/system-home'; },
     readdirSync() { return ['event0']; }, openSync() { return 3; },
     readSync(fd, buffer) {
       if (!events.length) throw Object.assign(new Error(), { code: 'EAGAIN' });
@@ -19,7 +20,8 @@ function scenario() {
   function Service() {
     this.register = (name, method) => { methods[name] = method; };
     this.call = (uri, payload, callback) => {
-      if (uri.endsWith('/launch')) { launched.push(payload.id); callback({ payload: { returnValue: true } }); }
+      if (uri.endsWith('/getForegroundAppInfo')) callback({ payload: { returnValue: true, appId: options.foreground || 'com.gathin.tvhome' } });
+      else if (uri.endsWith('/launch')) { launched.push(payload.id); callback({ payload: { returnValue: true } }); }
     };
   }
   vm.runInNewContext(source, {
@@ -60,4 +62,19 @@ test('native short Home requests only the custom desktop', () => {
 test('native long Home requests only the original Home', () => {
   const s = scenario(); s.native(1); s.native(0, 900); s.flush();
   assert.deepEqual(s.launched, ['com.webos.app.home']);
+});
+test('system-home short Home from HDMI opens the mounted Home', () => {
+  const s = scenario({ systemHome: true, foreground: 'com.webos.app.hdmi3' });
+  s.input(773, 1); s.input(773, 0, 150); s.flush();
+  assert.deepEqual(s.launched, ['com.webos.app.home']);
+});
+test('system-home short Back from HDMI opens the mounted Home', () => {
+  const s = scenario({ systemHome: true, foreground: 'com.webos.app.hdmi3' });
+  s.input(158, 1); s.input(158, 0, 120); s.flush();
+  assert.deepEqual(s.launched, ['com.webos.app.home']);
+});
+test('system-home short Back inside a content app is left alone', () => {
+  const s = scenario({ systemHome: true, foreground: 'com.biliwebos.app' });
+  s.input(158, 1); s.input(158, 0, 120); s.flush();
+  assert.deepEqual(s.launched, []);
 });

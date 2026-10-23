@@ -4,7 +4,7 @@
 
 A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.3**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.4**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 
@@ -31,7 +31,11 @@ The left side is a vertical list of the computer input and favourite apps. The f
 
 Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearance holds theme, wallpaper, Pure OLED Black, and input labels; Desktop holds home apps and content sources; System opens LG settings. Theme, wallpaper, home apps, order, and HDMI labels are stored on the TV; the normal app and the system-home copy share them through a TV-side state file.
 
-Input labels assign HDMI 1–4 to Default, PC, PS5, PS4, Xbox, Switch, or Media Center; the home computer entry shows the matching name and color mark.
+Input labels assign HDMI 1–4 to Default, PC, PS5, PS4, Xbox, Switch, or Media Center; the home computer entry shows the matching name and color mark. The HDMI 4 computer entry uses `computerInput` from `config.js` to show the PC name and desktop icon automatically; other ports remain manual presets because webOS does not expose a reliable HDMI device type.
+
+The **Content sources** panel shows each source’s state, item count, update time, and failure reason, with a summary and refresh at the top and TMDB, TVmaze, and JustWatch credits at the bottom.
+
+[![Content sources panel with five source states, update times, and credits](docs/images/content-sources-1.5.4.jpg)](docs/images/content-sources-1.5.4.jpg)
 
 The screen saver is no longer an in-app overlay. It bind-mounts over LG's `com.webos.app.screensaver` just like the system Home: after three idle minutes the system starts a pure-black floating clock, shifts it slightly about every 25 seconds, and dismisses it on any key. This prevents the stock screen saver from covering the custom one.
 
@@ -49,6 +53,7 @@ The screenshots show layout only. System Home, the screen saver, the cold-stone 
 | Shut down from HDMI, then power on | LG keeps the last input |
 | Exit an app launched from the desktop | Return directly to the custom desktop, without a stock-Home frame |
 | Back does not exit inside an app | Hold Back for about 0.7 seconds to return to the custom desktop |
+| Home or Back inside an HDMI input | Return to the system-home desktop |
 | Short Back inside an app | Keep the app's own back navigation |
 | Disable the desktop (`desktop_mode.py off`) | Unmount the system Home and restore LG stock Home |
 

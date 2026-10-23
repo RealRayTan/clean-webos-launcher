@@ -68,6 +68,8 @@ try { fs.writeFileSync(file, JSON.stringify(config)); } catch (error) {}
 EOF
 fi
 
+SCREENSAVER=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/screensaver-as-system.sh
+[ -f "$SCREENSAVER" ] && sh "$SCREENSAVER" </dev/null >/dev/null 2>&1 || true
 systemctl restart sam >>"$LOG" 2>&1 && echo "restarted sam" >>"$LOG"
 
 SVC=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh
