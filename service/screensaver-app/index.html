@@ -70,9 +70,11 @@
             var bridge = new PalmServiceBridge();
             bridge.call('luna://com.gathin.tvhome.service/closeApp',
               JSON.stringify({ id: 'com.webos.app.screensaver' }));
+            bridge.call('luna://com.gathin.tvhome.service/open', '{}');
           }
         } catch (error) {}
         setTimeout(function () { try { window.close(); } catch (error) {} }, 300);
+        setTimeout(function () { closing = false; }, 1200);
       }
 
       tick();
@@ -80,10 +82,9 @@
       setInterval(tick, 1000);
       setInterval(shift, SHIFT_MS);
       ['keydown', 'mousedown', 'wheel'].forEach(function (name) {
-        document.addEventListener(name, function (event) {
-          event.preventDefault();
+        document.addEventListener(name, function () {
           closeScreenSaver();
-        }, true);
+        }, false);
       });
     }());
   </script>

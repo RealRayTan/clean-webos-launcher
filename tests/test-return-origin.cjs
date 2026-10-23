@@ -52,4 +52,11 @@ test('system-home mode returns to mounted home after content app exit to input o
   const switchApp = scenario(() => true);
   switchApp.show(home); switchApp.show(bili); switchApp.show('youtube.leanback.v4');
   assert.equal(switchApp.launches.length, 0);
+
+  const fallbackWithoutSession = scenario(() => true);
+  fallbackWithoutSession.show('com.webos.app.hdmi1');
+  fallbackWithoutSession.show(bili);
+  fallbackWithoutSession.show('');
+  fallbackWithoutSession.power();
+  assert.deepEqual(fallbackWithoutSession.launches, ['return-from-app']);
 });

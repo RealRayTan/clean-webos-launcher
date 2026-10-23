@@ -38,12 +38,14 @@ exports.start = function (service, launch, enabled, active, log, isSystemHome) {
     var shouldReturn = false;
     if (session && previous === session.app) {
       shouldReturn = !contentApp(foreground);
+    } else if (systemHomeActive() && contentApp(previous) && (foreground === '' || foreground === nativeHome || foreground === 'com.webos.app.screensaver')) {
+      shouldReturn = true;
     }
     if (shouldReturn) {
       var owner = session;
-      owner.timer = setTimeout(function () { if (session === owner) cancel(); }, 1500);
+      if (owner) owner.timer = setTimeout(function () { if (session === owner) cancel(); }, 1500);
       service.call('luna://com.webos.service.tvpower/power/getPowerState', {}, function (result) {
-        if (session !== owner) return;
+        if (owner && session !== owner) return;
         cancel();
         var power = result && result.payload;
         var sleeping = !power || power.returnValue !== true ||

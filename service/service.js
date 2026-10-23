@@ -20,12 +20,8 @@ function handleHome(code, value, source) {
     if (value === 0 && keyDown) {
       var homeDuration = Date.now() - keyDown; keyDown = 0;
       if (homeDuration < 650) setTimeout(function () {
-        service.call('luna://com.webos.applicationManager/getForegroundAppInfo', {}, function (response) {
-          var homePayload = response && response.payload;
-          if (!enabled() || !homePayload || homePayload.returnValue !== true) return;
-          if (homePayload.appId === 'com.webos.app.home') return;
-          launch('home-tap-' + source);
-        });
+        if (!enabled()) return;
+        launch('home-tap-' + source);
       }, source === 'native' ? 0 : 40);
     }
     return;
@@ -51,11 +47,10 @@ function handleBack(value, source) {
       backDown = 0;
       service.call('luna://com.webos.applicationManager/getForegroundAppInfo', {}, function (response) {
         var payload = response && response.payload;
-        if (!enabled() || !payload || payload.returnValue !== true) return;
-        var id = payload.appId;
-        if (!id || id === 'com.webos.app.home' || id === APP || id === 'com.palm.app.settings' ||
-            id === 'com.webos.app.settings' || /^com\.webos\.app\.(hdmi[1-4]|livetv)$/.test(id)) return;
-        log('back-hold: ' + id);
+        if (!enabled()) return;
+        var id = payload && payload.returnValue === true ? payload.appId : '';
+        if (id === target()) return;
+        log('back-hold escape: ' + (id || 'empty'));
         launch('back-hold');
       });
     }, 650);

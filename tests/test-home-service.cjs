@@ -20,7 +20,7 @@ function scenario(options = {}) {
   function Service() {
     this.register = (name, method) => { methods[name] = method; };
     this.call = (uri, payload, callback) => {
-      if (uri.endsWith('/getForegroundAppInfo')) callback({ payload: { returnValue: true, appId: options.foreground || 'com.gathin.tvhome' } });
+      if (uri.endsWith('/getForegroundAppInfo')) callback({ payload: { returnValue: true, appId: options.foreground !== undefined ? options.foreground : 'com.gathin.tvhome' } });
       else if (uri.endsWith('/launch')) { launched.push(payload.id); callback({ payload: { returnValue: true } }); }
     };
   }
@@ -79,5 +79,27 @@ test('system-home short Back from HDMI opens the mounted Home', () => {
 test('system-home short Back inside a content app is left alone', () => {
   const s = scenario({ systemHome: true, foreground: 'com.biliwebos.app' });
   s.input(158, 1); s.input(158, 0, 120); s.flush();
+  assert.deepEqual(s.launched, []);
+});
+
+test('system-home short Home from mounted home foreground activates custom desktop', () => {
+  const s = scenario({ systemHome: true, foreground: 'com.webos.app.home' });
+  s.input(773, 1); s.input(773, 0, 150); s.flush();
+  assert.deepEqual(s.launched, ['com.gathin.tvhome']);
+});
+
+test('long Back provides emergency escape to desktop when foreground is stuck or empty', () => {
+  const s = scenario({ systemHome: true, foreground: '' });
+  s.input(158, 1); s.advance(700); s.flush();
+  assert.deepEqual(s.launched, ['com.gathin.tvhome']);
+
+  const sApp = scenario({ systemHome: true, foreground: 'com.biliwebos.app' });
+  sApp.input(158, 1); sApp.advance(700); sApp.flush();
+  assert.deepEqual(sApp.launched, ['com.gathin.tvhome']);
+});
+
+test('long Back when already on desktop does not relaunch', () => {
+  const s = scenario({ systemHome: true, foreground: 'com.gathin.tvhome' });
+  s.input(158, 1); s.advance(700); s.flush();
   assert.deepEqual(s.launched, []);
 });
