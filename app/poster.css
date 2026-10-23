@@ -735,3 +735,52 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
 .scene[data-theme="light"] .menu-item{color:var(--ink)}
 .scene[data-theme="light"] .menu-item.focus{background:var(--focus);color:#E6EBED}
 .scene[data-theme="light"] .overlay{background:rgba(28,33,36,.34)}
+
+/* Pure OLED theme: true black surfaces, low-chroma dark UI. */
+.scene[data-theme="oled"]{
+  --bg:#000; --ink:#F2F2F2; --muted:#9A9A9A; --focus:#E7EFCE;
+  --line:#242424; --surface:#0A0A0A; --panel:#0D0D0D; color-scheme:dark;
+}
+.scene[data-theme="oled"]:before{background:none}
+.scene[data-theme="oled"] .cover,
+.scene[data-theme="oled"] .cover-layer{background:#000}
+.scene[data-theme="oled"] .cover-left{background:linear-gradient(90deg,#000 0%,#000 20%,rgba(0,0,0,.9) 32%,rgba(0,0,0,.4) 46%,transparent 62%)}
+.scene[data-theme="oled"] .menu-panel{background:#000;border-color:#262626;box-shadow:0 24px 70px rgba(0,0,0,.7)}
+.scene[data-theme="oled"] .theme-toggle{border-color:rgba(255,255,255,.18)}
+.scene[data-theme="oled"] .overlay{background:rgba(0,0,0,.78)}
+
+/* HDMI device label badges (text marks rather than third-party logos). */
+.row .mark.device-mark,
+.list-item .mark.device-mark{
+  border:1px solid currentColor;
+  background:color-mix(in srgb,currentColor 13%,transparent);
+  color:var(--ink);
+  font-size:11px;
+  font-weight:600;
+  letter-spacing:.2px;
+  line-height:1;
+}
+.row.focus .mark.device-mark{border-width:2px}
+
+/* OLED-safe idle screensaver. */
+.screensaver{
+  position:absolute;inset:0;z-index:50;background:#000;
+  display:flex;align-items:center;justify-content:center;cursor:none;
+}
+.screensaver[hidden]{display:none}
+.screensaver-clock-wrap{text-align:center;transition:transform 1.4s ease-in-out;will-change:transform}
+.screensaver-clock{
+  font-size:132px;font-weight:200;line-height:1;letter-spacing:-2px;
+  color:rgba(255,255,255,.82);font-variant-numeric:tabular-nums;
+}
+.screensaver-date{
+  margin-top:10px;font-size:22px;font-weight:400;letter-spacing:2px;
+  color:rgba(255,255,255,.4);
+}
+@media (prefers-reduced-motion: reduce){.screensaver-clock-wrap{transition:none}}
+
+/* HDMI input label rows. */
+.device-copy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.device-note{color:var(--muted);font-size:17px;line-height:1.3}
+.device-cycle{margin-left:auto;color:var(--muted);font-size:18px;white-space:nowrap;letter-spacing:.2px}
+.list-item.device-row{gap:16px}

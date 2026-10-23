@@ -22,6 +22,8 @@
 
 按键接管方案比较过 [Simon34545/lginputhook](https://github.com/Simon34545/lginputhook) 与 [zzeppieri/webos-custom-home](https://github.com/zzeppieri/webos-custom-home)，两者都不是当前依赖。前期调研项目包括 [Gathin23/cleanyourtv](https://github.com/Gathin23/cleanyourtv)。动态磁贴布局参考了 [Jakub Kralka 的布局展示](https://x.com/jakubkralka/status/2112548525577785621) 与 [动效演示](https://x.com/jakubkralka/status/2112629158547423480)。
 
+1.5.2 的 OLED 待机屏保、HDMI 输入标签和纯黑主题功能设计参考了 [danielthejoker18/FreeMyTvWebOS](https://github.com/danielthejoker18/FreeMyTvWebOS)（MIT）；实现按本仓库的 D13 布局、中文 UI 和状态服务重写。
+
 1.5.0 的系统 Home bind mount 启动方式参考了 [theboringhumane/theboringtv-lgwebos](https://github.com/theboringhumane/theboringtv-lgwebos) 的 `as-home.sh` 思路；本仓库的脚本按当前 appid、共享状态、内容缓存和回滚路径重写。
 
 原生模块版本与校验值见[原生依赖来源](native.md)，摄影素材许可与作者署名见[素材记录](../app/ASSETS.md)。

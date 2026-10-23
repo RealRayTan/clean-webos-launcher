@@ -9,7 +9,7 @@ var stateFile = path.join(stateDir, 'app-state.json');
 
 function valid(state) {
   if (!state || typeof state !== 'object') return false;
-  if (['auto', 'light', 'dark'].indexOf(state.theme) < 0) return false;
+  if (['auto', 'light', 'dark', 'oled'].indexOf(state.theme) < 0) return false;
   if (['valley', 'peaks', 'plain'].indexOf(state.wallpaper) < 0) return false;
   if (!Array.isArray(state.apps) || state.apps.length > 60) return false;
   var seen = Object.create(null);
@@ -17,6 +17,14 @@ function valid(state) {
     var id = state.apps[i];
     if (typeof id !== 'string' || !/^[A-Za-z0-9_.-]+$/.test(id) || seen[id]) return false;
     seen[id] = true;
+  }
+  if (state.devices != null) {
+    if (typeof state.devices !== 'object' || Array.isArray(state.devices)) return false;
+    var keys = ['default', 'pc', 'ps5', 'ps4', 'xbox', 'switch', 'media'];
+    var ids = Object.keys(state.devices);
+    for (var j = 0; j < ids.length; j++) {
+      if (!/^com\.webos\.app\.hdmi[1-4]$/.test(ids[j]) || keys.indexOf(state.devices[ids[j]]) < 0) return false;
+    }
   }
   return typeof state.lastFocus === 'string' && /^[A-Za-z0-9_.-]+$/.test(state.lastFocus);
 }

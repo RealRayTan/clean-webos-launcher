@@ -7,6 +7,8 @@
   var panelButtons = Array.prototype.slice.call(panelEl.querySelectorAll('.menu-item'));
   var layers = [$('layerA'), $('layerB')], backgrounds = [$('bgA'), $('bgB')], cards = [$('cardA'), $('cardB')];
   var clockEl = $('clock'), dateEl = $('date'), captionTitle = $('captionTitle'), captionText = $('captionText');
+  var screensaver = $('screensaver'), screensaverClockWrap = $('screensaverClockWrap');
+  var screensaverClock = $('screensaverClock'), screensaverDate = $('screensaverDate');
   var focusLine = null;
   var KEY = 'tvhome.tiles.v1';
   var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
@@ -30,6 +32,27 @@
     'com.apple.appletv': '正在读取 Apple TV 片单',
     amazon: '正在读取 Prime Video 片单'
   };
+  var deviceKeys = ['default', 'pc', 'ps5', 'ps4', 'xbox', 'switch', 'media'];
+  var devicePresets = {
+    default: { name: '', badge: '', color: '' },
+    pc: { name: '电脑', badge: 'PC', color: '#3B82F6' },
+    ps5: { name: 'PS5', badge: 'PS5', color: '#123CA6' },
+    ps4: { name: 'PS4', badge: 'PS4', color: '#173070' },
+    xbox: { name: 'Xbox', badge: 'Xbox', color: '#107C10' },
+    switch: { name: 'Switch', badge: 'Switch', color: '#C82131' },
+    media: { name: '媒体中心', badge: 'MEDIA', color: '#5B6B5D' }
+  };
+  function cleanDevices(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
+    var out = {};
+    Object.keys(value).forEach(function (id) {
+      if (/^com\.webos\.app\.hdmi[1-4]$/.test(id) && deviceKeys.indexOf(value[id]) >= 0) out[id] = value[id];
+    });
+    return out;
+  }
+  function deviceInfo(id) {
+    return devicePresets[state.devices && state.devices[id]] || devicePresets.default;
+  }
   function sanitizeApps(value) {
     if (!Array.isArray(value)) return [];
     var seen = Object.create(null);
@@ -41,13 +64,13 @@
   }
   var catalog = sanitizeApps(window.TV_APPS && TV_APPS.apps);
   try { var cached = sanitizeApps(JSON.parse(localStorage.getItem('tvhome.catalog'))); if (cached.length) catalog = cached; } catch (error) {}
-  var state = { theme: 'auto', wallpaper: 'valley', apps: defaults.slice(), lastFocus: 'computer' };
+  var state = { theme: 'auto', wallpaper: 'valley', apps: defaults.slice(), lastFocus: 'computer', devices: {} };
   var hasLocalState = false;
   try {
     var saved = JSON.parse(localStorage.getItem(KEY));
-    if (saved && ['auto', 'light', 'dark'].indexOf(saved.theme) >= 0 && ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) >= 0 && Array.isArray(saved.apps)) {
+    if (saved && ['auto', 'light', 'dark', 'oled'].indexOf(saved.theme) >= 0 && ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) >= 0 && Array.isArray(saved.apps)) {
       hasLocalState = true;
-      state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: saved.apps.filter(function (id, i, all) { return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i; }), lastFocus: saved.lastFocus || 'computer' };
+      state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: saved.apps.filter(function (id, i, all) { return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i; }), lastFocus: saved.lastFocus || 'computer', devices: cleanDevices(saved.devices) };
     } else {
       var hidden = JSON.parse(localStorage.getItem('tvhome.hidden'));
       if (!Array.isArray(hidden)) hidden = CONFIG.hiddenApps || [];
@@ -63,13 +86,15 @@
   var dialogType = '', returnZone = 'list', loadingApps = false, lastLaunch = 0, toastTimer;
   var okDown = false, okTarget = null, orderDraft = null, movingId = null;
   var vpnRequest = 0;
+  var screensaverOn = false, lastActivity = Date.now(), screensaverShiftTimer = 0;
+  var IDLE_TIMEOUT_MS = 3 * 60 * 1000, PIXEL_SHIFT_MS = 25 * 1000;
   document.body.classList.toggle('on-tv', TVDevice.available);
 
   function homeIds() { return state.apps.filter(function (id) { return !!installed(id); }); }
   function icon(file) { var img = document.createElement('img'); img.src = 'assets/' + file; img.alt = ''; return img; }
   function toast(text) { var el = $('toast'); el.textContent = text; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('visible'); }, 2400); }
   function commit(changes) {
-    var next = { theme: state.theme, wallpaper: state.wallpaper, apps: state.apps.slice(), lastFocus: state.lastFocus };
+    var next = { theme: state.theme, wallpaper: state.wallpaper, apps: state.apps.slice(), lastFocus: state.lastFocus, devices: state.devices || {} };
     Object.keys(changes).forEach(function (key) { next[key] = changes[key]; });
     try { localStorage.setItem(KEY, JSON.stringify(next)); }
     catch (error) { toast('保存失败，已保留原来的设置'); return false; }
@@ -78,13 +103,13 @@
     return true;
   }
   function adoptState(saved) {
-    if (!saved || ['auto', 'light', 'dark'].indexOf(saved.theme) < 0 ||
+    if (!saved || ['auto', 'light', 'dark', 'oled'].indexOf(saved.theme) < 0 ||
         ['valley', 'peaks', 'plain'].indexOf(saved.wallpaper) < 0 || !Array.isArray(saved.apps)) return;
     var apps = saved.apps.filter(function (id, i, all) {
       return typeof id === 'string' && /^[A-Za-z0-9_.-]+$/.test(id) && all.indexOf(id) === i;
     });
     state = { theme: saved.theme, wallpaper: saved.wallpaper, apps: apps,
-      lastFocus: typeof saved.lastFocus === 'string' ? saved.lastFocus : 'computer' };
+      lastFocus: typeof saved.lastFocus === 'string' ? saved.lastFocus : 'computer', devices: cleanDevices(saved.devices) };
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (error) {}
     hasLocalState = true;
     appearance(); renderList(state.lastFocus);
@@ -104,18 +129,57 @@
   function appearance() {
     var effective = FrameTheme.resolve(state.theme, new Date().getHours());
     scene.dataset.theme = effective; scene.dataset.wallpaper = state.wallpaper;
-    $('theme').setAttribute('aria-label', (effective === 'dark' ? '切换浅色主题' : '切换深色主题') + (state.theme === 'auto' ? '，当前按时间自动切换' : ''));
+    var darkLike = effective === 'dark' || effective === 'oled';
+    $('theme').setAttribute('aria-label', (darkLike ? '切换浅色主题' : '切换深色主题') + (state.theme === 'auto' ? '，当前按时间自动切换' : ''));
   }
   function clock() {
     var now = new Date(), h = now.getHours();
-    clockEl.textContent = ('0' + h).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
-    dateEl.textContent = (now.getMonth() + 1) + '月' + now.getDate() + '日，星期' + '日一二三四五六'.charAt(now.getDay());
+    var time = ('0' + h).slice(-2) + ':' + ('0' + now.getMinutes()).slice(-2);
+    var date = (now.getMonth() + 1) + '月' + now.getDate() + '日，星期' + '日一二三四五六'.charAt(now.getDay());
+    clockEl.textContent = time;
+    dateEl.textContent = date;
+    if (screensaverClock) screensaverClock.textContent = time;
+    if (screensaverDate) screensaverDate.textContent = date.replace('，', ' ');
     appearance();
+  }
+  function shiftScreensaverClock() {
+    var maxX = 240, maxY = 140;
+    var x = Math.round((Math.random() - .5) * 2 * maxX);
+    var y = Math.round((Math.random() - .5) * 2 * maxY);
+    if (screensaverClockWrap) screensaverClockWrap.style.transform = 'translate(' + x + 'px, ' + y + 'px)';
+  }
+  function enterScreensaver() {
+    if (screensaverOn || document.hidden || !overlay.hidden || !panelEl.hidden) return;
+    screensaverOn = true;
+    screensaver.hidden = false;
+    shiftScreensaverClock();
+    clearInterval(screensaverShiftTimer);
+    screensaverShiftTimer = setInterval(shiftScreensaverClock, PIXEL_SHIFT_MS);
+  }
+  function exitScreensaver() {
+    if (!screensaverOn) return;
+    screensaverOn = false;
+    screensaver.hidden = true;
+    clearInterval(screensaverShiftTimer);
+    screensaverShiftTimer = 0;
+    lastActivity = Date.now();
+  }
+  function markActivity() {
+    lastActivity = Date.now();
+    if (screensaverOn) exitScreensaver();
   }
 
   function wallpaperSrc() { return state.wallpaper === 'peaks' ? 'assets/peaks.jpg' : 'assets/valley.jpg'; }
   function homeItems() {
-    var list = [{ id: computer, name: '电脑', meta: 'HDMI 4', icon: 'device-desktop.svg', style: 'computer', desc: '切换到电脑输入源', fallback: wallpaperSrc() }];
+    var preset = deviceInfo(computer);
+    var computerName = preset.name || '电脑';
+    var list = [{
+      id: computer, name: computerName, meta: 'HDMI 4',
+      icon: preset.badge ? '' : 'device-desktop.svg',
+      badge: preset.badge, badgeColor: preset.color,
+      style: 'computer', desc: preset.name ? '切换到 ' + preset.name + ' 输入源' : '切换到电脑输入源',
+      fallback: wallpaperSrc()
+    }];
     homeIds().forEach(function (id) {
       var info = appInfo(id);
       list.push({ id: id, name: info.name, meta: info.subtitle, icon: info.icon, installedIcon: info.installedIcon, style: info.style, subtitle: info.subtitle, desc: '打开应用', fallback: wallpaperSrc() });
@@ -134,7 +198,12 @@
       var row = document.createElement('button');
       row.type = 'button'; row.className = 'row'; row.dataset.index = String(i); row.setAttribute('role', 'option');
       row.setAttribute('aria-label', (app.id === computer ? '电脑，切换到 HDMI 4' : '打开 ' + app.name));
-      if (app.icon) {
+      if (app.badge) {
+        var deviceMark = document.createElement('span'); deviceMark.className = 'mark device-mark';
+        deviceMark.textContent = app.badge;
+        if (app.badgeColor) deviceMark.style.color = app.badgeColor;
+        row.appendChild(deviceMark);
+      } else if (app.icon) {
         var iconBox = document.createElement('span');
         iconBox.className = 'icon' + (app.style && ['bili', 'youtube', 'netflix'].indexOf(app.style) >= 0 ? ' icon--' + app.style : '');
         var image = document.createElement('img'); image.src = 'assets/' + app.icon; image.alt = ''; iconBox.appendChild(image); row.appendChild(iconBox);
@@ -394,11 +463,12 @@
   function openDialog(type, key) {
     if (overlay.hidden) returnZone = zone;
     overlay.hidden = false; dialogType = type; body.innerHTML = ''; body.scrollTop = 0; panel.dataset.view = type;
-    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源' }[type];
+    $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', devices: '输入源标签' }[type];
     if (type === 'all' || type === 'manage') renderCatalog(type === 'manage');
     if (type === 'settings') renderSettings();
     if (type === 'sources') PublicContent.settings(body);
     if (type === 'inputs') renderInputs();
+    if (type === 'devices') renderDevices();
     if (type === 'order') renderOrder();
     focusKey(key || (body.querySelector('button') && body.querySelector('button').dataset.key));
   }
@@ -490,21 +560,72 @@
       return item;
     }
     var appearanceSection = section('外观');
-    choices(appearanceSection, '主题', 'theme', [['auto', '自动'], ['dark', '深色'], ['light', '浅色']]);
+    choices(appearanceSection, '主题', 'theme', [['auto', '自动'], ['dark', '深色'], ['light', '浅色'], ['oled', 'OLED 纯黑']]);
     choices(appearanceSection, '背景', 'wallpaper', [['valley', '山谷'], ['peaks', '雾峰'], ['plain', '纯色']]);
     var desktopSection = section('桌面');
     var actions = document.createElement('div'); actions.className = 'settings-actions'; desktopSection.appendChild(actions);
     actions.appendChild(action('编辑应用', '首页应用与顺序', 'layout-grid.svg', 'edit-home', function () { openDialog('manage'); }));
+    actions.appendChild(action('输入源标签', 'HDMI 设备与名称', 'plug-connected.svg', 'input-labels', function () { openDialog('devices'); }));
     actions.appendChild(action('内容来源', '公开内容与来源', 'tmdb.svg', 'sources', function () { openDialog('sources'); }));
     var systemSection = section('系统');
     systemSection.appendChild(action('LG 系统设置', '电视系统与网络', 'settings.svg', 'system-settings', function () { launch('com.palm.app.settings'); }));
   }
+  function inputsList() {
+    var inputs = window.TV_APPS && Array.isArray(TV_APPS.inputs) ? TV_APPS.inputs.slice() : [];
+    if (!inputs.length) inputs = [1, 2, 3, 4].map(function (n) { return { appId: 'com.webos.app.hdmi' + n, label: 'HDMI ' + n }; });
+    return inputs;
+  }
+  function inputDeviceMark(preset) {
+    var mark = document.createElement('span');
+    if (preset.badge) {
+      mark.className = 'mark device-mark';
+      mark.textContent = preset.badge;
+      if (preset.color) mark.style.color = preset.color;
+    } else {
+      mark.className = 'mark';
+      mark.appendChild(icon('plug-connected.svg'));
+    }
+    return mark;
+  }
+  function renderDevices() {
+    paragraph('选择 HDMI 端口的设备标签。点击一行循环切换，标签会同步到输入源和首页电脑入口。');
+    var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
+    inputsList().forEach(function (input) {
+      var key = 'device-' + input.appId;
+      var preset = deviceInfo(input.appId);
+      var row = button('', 'list-item device-row', key, function () {
+        var devices = Object.assign({}, state.devices || {});
+        var current = devices[input.appId] || 'default';
+        devices[input.appId] = deviceKeys[(deviceKeys.indexOf(current) + 1) % deviceKeys.length];
+        if (!commit({ devices: devices })) return;
+        renderList();
+        openDialog('devices', key);
+      });
+      row.appendChild(inputDeviceMark(preset));
+      var copy = document.createElement('span'); copy.className = 'device-copy';
+      var name = document.createElement('span'); name.textContent = (input.label || 'HDMI') + ' · ' + (preset.name || '默认');
+      copy.appendChild(name);
+      if (preset.badge) { var tag = document.createElement('small'); tag.className = 'device-note'; tag.textContent = '点击切换设备标签'; copy.appendChild(tag); }
+      row.appendChild(copy);
+      var cycle = document.createElement('span'); cycle.className = 'device-cycle';
+      cycle.textContent = preset.badge ? '切换' : '添加标签';
+      row.appendChild(cycle);
+      list.appendChild(row);
+    });
+  }
   function renderInputs() {
     var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
-    var inputs = window.TV_APPS && Array.isArray(TV_APPS.inputs) ? TV_APPS.inputs : [];
-    if (!inputs.length) inputs = [1, 2, 3, 4].map(function (n) { return { appId: 'com.webos.app.hdmi' + n, label: 'HDMI ' + n }; });
-    inputs.forEach(function (input) {
-      var row = button('', 'list-item', input.appId, function () { launch(input.appId); }); row.appendChild(icon('plug-connected.svg')); row.appendChild(document.createTextNode(input.label || input.appId)); list.appendChild(row);
+    inputsList().forEach(function (input) {
+      var preset = deviceInfo(input.appId);
+      var row = button('', 'list-item', input.appId, function () { launch(input.appId); });
+      row.appendChild(inputDeviceMark(preset));
+      row.appendChild(document.createTextNode((preset.name ? preset.name + ' · ' : '') + (input.label || input.appId)));
+      if (preset.badge) {
+        var edit = document.createElement('span'); edit.className = 'device-cycle'; edit.textContent = '标签';
+        edit.onclick = function (event) { event.stopPropagation(); openDialog('devices'); };
+        row.appendChild(edit);
+      }
+      list.appendChild(row);
     });
     if (CONFIG.liveTvApp) list.appendChild(button('直播电视', 'list-item', 'live-tv', function () { launch(CONFIG.liveTvApp); }));
   }
@@ -515,7 +636,8 @@
   panelButtons.forEach(function (item) { item.addEventListener('click', function () { act(item.dataset.action); }); });
   $('theme').onclick = function () {
     var wasAuto = state.theme === 'auto';
-    if (!commit({ theme: scene.dataset.theme === 'dark' ? 'light' : 'dark' })) return;
+    var next = scene.dataset.theme === 'light' ? 'dark' : 'light';
+    if (!commit({ theme: next })) return;
     appearance();
     if (wasAuto) toast('已固定主题，可在设置中恢复自动');
   };
@@ -525,6 +647,8 @@
 
   document.addEventListener('keydown', function (event) {
     var key = event.key || ({ 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 27: 'Escape', 461: 'Escape' })[event.keyCode] || '';
+    if (screensaverOn) { event.preventDefault(); exitScreensaver(); return; }
+    lastActivity = Date.now();
     if (!overlay.hidden) {
       if (key.indexOf('Arrow') === 0) {
         event.preventDefault();
@@ -571,7 +695,7 @@
   });
 
   function resume() {
-    resetKeys(); clock();
+    resetKeys(); markActivity(); clock();
     if (!overlay.hidden) closeDialog();
     var wanted = state.lastFocus;
     items.forEach(function (item, i) { if (item.id === wanted) index = i; });
@@ -579,8 +703,14 @@
     refreshApps(false); refreshVpn();
   }
   document.addEventListener('webOSRelaunch', resume);
-  document.addEventListener('visibilitychange', function () { if (document.hidden) { resetKeys(); vpnRequest++; } else resume(); });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) { exitScreensaver(); resetKeys(); vpnRequest++; }
+    else resume();
+  });
   window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);
+  ['mousedown', 'mousemove', 'wheel'].forEach(function (name) {
+    document.addEventListener(name, markActivity, { passive: true });
+  });
 
   backgrounds[0].src = 'assets/valley.jpg'; cards[0].src = 'assets/valley.jpg';
   frontIndex = 0; frontImage = 'assets/valley.jpg';
@@ -597,4 +727,8 @@
     PublicContent.start();
   }
   setInterval(clock, 10000); setInterval(refreshVpn, 20000);
+  setInterval(function () {
+    if (!screensaverOn && overlay.hidden && panelEl.hidden && !document.hidden &&
+        Date.now() - lastActivity > IDLE_TIMEOUT_MS) enterScreensaver();
+  }, 10000);
 }());

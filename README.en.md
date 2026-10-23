@@ -4,7 +4,7 @@
 
 A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, and shared launcher state added here. Current source and tested version: **1.5.1**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, and shared launcher state added here. Current source and tested version: **1.5.2**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 
@@ -18,7 +18,7 @@ To restore LG stock Home temporarily, run `tools/desktop_mode.py off`; run `on` 
 
 | LG stock home | Custom desktop |
 |---|---|
-| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![System-home poster-list desktop with the app list and a Bilibili cover](docs/images/poster-home-1.5.1.png)](docs/images/poster-home-1.5.1.png) |
+| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![System-home OLED poster-list desktop with the app list and a Prime Video cover](docs/images/poster-home-1.5.2.png)](docs/images/poster-home-1.5.2.png) |
 
 The left side is a vertical list of the computer input and favourite apps. The focused app gets a dynamic cover:
 
@@ -29,7 +29,9 @@ The left side is a vertical list of the computer input and favourite apps. The f
 - Themes are auto, dark, and light. In light mode the clock and caption use a translucent paper surface.
 - Wallpapers are a valley, misty mountains, or a solid color. The theme switches on local TV time at 07:00 and 19:00, or can be locked in settings.
 
-Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearance holds theme and wallpaper, Desktop holds home apps and content sources, and System opens LG settings. Theme, wallpaper, home apps, and order are stored on the TV; the normal app and the system-home copy share them through a TV-side state file.
+Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearance holds theme, wallpaper, Pure OLED Black, and input labels; Desktop holds home apps and content sources; System opens LG settings. Theme, wallpaper, home apps, order, and HDMI labels are stored on the TV; the normal app and the system-home copy share them through a TV-side state file.
+
+Input labels assign HDMI 1–4 to Default, PC, PS5, PS4, Xbox, Switch, or Media Center; the home computer entry shows the matching name and color mark. The theme list adds **Pure OLED Black**. After three idle minutes the launcher enters a pure-black floating-clock screensaver, shifts it slightly about every 25 seconds, and dismisses it on any key.
 
 Short Back stays with the app. When an app consumes Back and will not exit, holding Back for about 0.7 seconds returns to the desktop without breaking short in-app navigation.
 
