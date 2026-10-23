@@ -8,20 +8,28 @@ import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def ssh_target():
+    host = os.environ.get('TV_HOST', '')
+    if host:
+        return 'root@' + host
+    return 'lgtv'
+
 def ssh_args():
     host = os.environ.get('TV_HOST', '')
     key = os.environ.get('TV_SSH_KEY', '')
-    if not re.fullmatch(r'[A-Za-z0-9_.:-]+', host):
-        raise ValueError('Set TV_HOST to your TV address')
-    if not key or not Path(key).expanduser().is_file():
-        raise ValueError('Set TV_SSH_KEY to your root SSH private key')
-    return ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'IdentitiesOnly=yes', '-i', str(Path(key).expanduser())]
+    if host and key:
+        if not re.fullmatch(r'[A-Za-z0-9_.:-]+', host):
+            raise ValueError('Set TV_HOST to your TV address')
+        if not Path(key).expanduser().is_file():
+            raise ValueError('Set TV_SSH_KEY to your root SSH private key')
+        return ['ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8', '-o', 'IdentitiesOnly=yes', '-i', str(Path(key).expanduser())]
+    return ['ssh']
 
 def remote(command, tty=False, timeout=20):
     args = ssh_args()
     if tty:
         args.append('-tt')
-    args += ['root@' + os.environ['TV_HOST'], command]
+    args += [ssh_target(), command]
     return subprocess.run(args, capture_output=True, timeout=timeout)
 
 def call(uri, payload=None, timeout=15, app_id=None):
