@@ -36,7 +36,7 @@ app.id = 'com.webos.app.home';
 app.title = 'Home';
 app.visible = false;
 app.appCategory = ['home'];
-app.handlesRelaunch = true;
+app.handlesRelaunch = false;
 delete app.class;
 fs.writeFileSync(file, JSON.stringify(app, null, 2));
 EOF
@@ -49,7 +49,7 @@ mount --bind "$TMP" "$DST" || exit 0
 var fs = require('fs'), file = process.argv[2];
 var app = JSON.parse(fs.readFileSync(file, 'utf8'));
 app.visible = false;
-app.class = Object.assign({}, app.class || {}, { hidden: true });
+delete app.class;
 process.stdout.write(JSON.stringify(app, null, 2));
 EOF
 mount --bind /tmp/gathin-regular-appinfo.json "$SRC/appinfo.json" || true

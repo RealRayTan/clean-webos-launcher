@@ -13,7 +13,7 @@
   "disableBackHistoryAPI": true,
   "noSplashOnLaunch": true,
   "supportQuickStart": true,
-  "handlesRelaunch": true,
+  "handlesRelaunch": false,
   "requiredACG": [
     "application.launcher",
     "network.query"
