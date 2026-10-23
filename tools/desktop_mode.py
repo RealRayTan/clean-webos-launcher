@@ -19,6 +19,9 @@ if sys.argv[1:] == ['off']:
         f'umount {SRC}/appinfo.json 2>/dev/null || true; '
         f'if [ -f {STATE}/keybinds.before.json ]; then '
         f'cp {STATE}/keybinds.before.json /home/root/.config/lginputhook/keybinds.json; fi; '
+        f'if [ -f {STATE}/boot-input.orig ]; then '
+        f'node -e "try{{var orig=JSON.parse(require(\'fs\').readFileSync(\'{STATE}/boot-input.orig\',\'utf8\'));if(orig.settings){{var p=JSON.stringify({{category:\'general\',settings:orig.settings}});require(\'child_process\').execSync(\'luna-send -n 1 -w 5000 luna://com.webos.settingsservice/setSystemSettings \' + JSON.stringify(p));}}}}catch(e){{}}"; '
+        f'rm -f {STATE}/boot-input.orig; fi; '
         'systemctl restart sam || true; '
         'rm -f /tmp/homeback-remote-ipc/lease'
     )

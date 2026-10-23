@@ -278,7 +278,7 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
   left: 16px;
   top: 0;
   width: 640px;
-  transition: transform 280ms var(--ease);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform;
 }
 
@@ -292,7 +292,7 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
   background: #f3f5ec;
   box-shadow: 0 0 18px rgba(243, 245, 236, .35);
   transform: translateY(0);
-  transition: transform 280ms var(--ease);
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 2;
   pointer-events: none;
   will-change: transform;
@@ -313,7 +313,7 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
   text-align: left;
   cursor: pointer;
   opacity: .42;
-  transition: opacity 160ms linear;
+  transition: opacity 140ms ease-out, transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .row:focus,
@@ -323,18 +323,15 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
 .menu-item:focus,
 .menu-item:focus-visible { outline: none; }
 
-.row.focus { opacity: 1; }
+.row.focus {
+  opacity: 1;
+  transform: translateX(4px);
+}
 
 .row .icon,
 .row .name,
 .row .meta {
-  transition: transform 280ms var(--ease);
-}
-
-.row.focus .icon,
-.row.focus .name,
-.row.focus .meta {
-  transform: translateX(4px);
+  transition: color 140ms ease-out;
 }
 
 .row .icon {

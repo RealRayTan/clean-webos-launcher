@@ -11,11 +11,25 @@ var lastLaunch = 0;
 var keyDown = 0, backDown = 0, backTimer = 0;
 var inputFiles = [];
 function isSystemHome() { return fs.existsSync(systemHome); }
-function target() { return isSystemHome() ? 'com.webos.app.home' : APP; }
+function target() { return APP; }
 function handleHome(code, value, source) {
   if (code !== 773 && code !== 102) return;
-  // With the custom app mounted as the system home, leave Home to webOS.
-  if (isSystemHome()) return;
+  if (isSystemHome()) {
+    if (keyDown && Date.now() - keyDown > 6000) keyDown = 0;
+    if (value === 1 && !keyDown) keyDown = Date.now();
+    if (value === 0 && keyDown) {
+      var homeDuration = Date.now() - keyDown; keyDown = 0;
+      if (homeDuration < 650) setTimeout(function () {
+        service.call('luna://com.webos.applicationManager/getForegroundAppInfo', {}, function (response) {
+          var homePayload = response && response.payload;
+          if (!enabled() || !homePayload || homePayload.returnValue !== true) return;
+          if (homePayload.appId === 'com.webos.app.home') return;
+          launch('home-tap-' + source);
+        });
+      }, source === 'native' ? 0 : 40);
+    }
+    return;
+  }
   log('home event ' + source + ' code=' + code + ' value=' + value);
   if (keyDown && Date.now() - keyDown > 6000) keyDown = 0;
   if (value === 1 && !keyDown) keyDown = Date.now();
@@ -46,7 +60,18 @@ function handleBack(value, source) {
       });
     }, 650);
   } else if (value === 0 && backDown) {
+    var shortDuration = Date.now() - backDown;
     clearTimeout(backTimer); backTimer = 0; backDown = 0;
+    if (shortDuration < 650 && isSystemHome()) {
+      service.call('luna://com.webos.applicationManager/getForegroundAppInfo', {}, function (response) {
+        var payload = response && response.payload;
+        if (!enabled() || !payload || payload.returnValue !== true) return;
+        var id = payload.appId;
+        if (!id || !/^com\.webos\.app\.(hdmi[1-4]|livetv)$/.test(id)) return;
+        log('back-tap input: ' + id);
+        launch('back-tap');
+      });
+    }
   }
 }
 function handleKey(code, value, source) {

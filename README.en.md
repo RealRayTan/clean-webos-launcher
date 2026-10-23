@@ -4,7 +4,7 @@
 
 A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.3**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.4**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 

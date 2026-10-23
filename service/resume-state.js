@@ -55,13 +55,25 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
       } else { remember(foreground); finish(true); }
     });
   }
-  service._resumeForeground = service.subscribe('luna://com.webos.applicationManager/getForegroundAppInfo', { subscribe: true });
-  service._resumeForeground.on('response', function (response) {
+  var resumeSubTimer = null;
+  function handleResumeForeground(response) {
     var data = response && response.payload;
-    if (!data || data.returnValue !== true || !data.appId) return;
-    foreground = data.appId;
+    if (!data || data.returnValue !== true) {
+      if (!resumeSubTimer) resumeSubTimer = setTimeout(connectResume, 2000);
+      return;
+    }
+    var id = typeof data.appId === 'string' ? data.appId : '';
+    if (!id && typeof isSystemHome === 'function' && isSystemHome()) id = desktop;
+    if (!id) return;
+    foreground = id;
     if (phase === 'active') remember(foreground);
-  });
+  }
+  function connectResume() {
+    if (resumeSubTimer) { clearTimeout(resumeSubTimer); resumeSubTimer = null; }
+    service._resumeForeground = service.subscribe('luna://com.webos.applicationManager/getForegroundAppInfo', { subscribe: true });
+    service._resumeForeground.on('response', handleResumeForeground);
+  }
+  connectResume();
   function poll() {
     if (!enabled()) { invalidate(); return; }
     persist();
@@ -75,7 +87,8 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
       if (!enabled()) { invalidate(); return; }
       var power = response && response.payload;
       if (!power || power.returnValue !== true) return;
-      if (power.state !== 'Active' || /power off|suspend/i.test(power.processing || '')) {
+      var sleeping = /suspend|standby|power off/i.test(power.state || '') || /power off|suspend/i.test(power.processing || '');
+      if (sleeping) {
         if (phase !== 'sleep') log('freeze screen: ' + saved + ' power=' + power.state);
         invalidate(); phase = 'sleep'; attempts = 0; return;
       }

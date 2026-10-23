@@ -50,7 +50,7 @@ flowchart LR
 
 系统 Home 副本和普通应用使用同一个内容缓存目录，并允许两者调用 `publicContent`、`vpnStatus` 和 `app-state`。`service/app-state.js` 保存首页应用、顺序、主题、背景和最后焦点；安装时普通应用先启动一次把旧 localStorage 写入状态文件，Home 副本首次启动读取它。
 
-`service/service.js` 在系统 Home 模式下让 Home 键走 webOS 原生路径，不再启动旧助手。返回键事件仍被非阻塞读取：短按不处理，长按约 650 毫秒且前台是内容应用时，启动系统 Home。`return-origin` 在该模式下停用，`resume-state` 的桌面目标改为 `com.webos.app.home`。
+`service/service.js` 在系统 Home 模式下让 Home 键走 webOS 原生路径，不再启动旧助手。返回键事件仍被非阻塞读取：短按不处理，长按约 650 毫秒且前台是内容应用时，启动系统 Home。`return-origin` 在该模式下负责从桌面启动的内容应用退出时的拉回兜底，通过显式启动已挂载的 `com.webos.app.home` 避免回落到非法输入源或后台挂起导致黑屏；`resume-state` 的桌面目标改为 `com.webos.app.home`。
 
 `tools/desktop_mode.py off` 卸载系统 Home 和屏保的 bind mount、移除启动钩子、恢复键位并重启 `sam`，然后打开原厂 Home；`on` 重新执行两个挂载脚本。
 
@@ -89,3 +89,11 @@ flowchart LR
 `service/public-content.js` 通过 `publicContent` 提供内容，只接受桌面应用调用。来源与图片域名固定在代码中，HTTPS 请求有超时和大小限制，不接受前端指定任意 URL。1.5.1 起服务端每 5 分钟检查一次，公开来源缓存 15 分钟，TMDB 片库缓存 30 分钟；应用每 60 秒读取结果。前端获得的图片是应用目录内的缓存相对路径。1.5.1 起公开来源按 15 分钟、TMDB 片库按 30 分钟缓存，服务每 5 分钟检查；失败保留原内容与原时间，重试至少间隔五分钟；未被当前内容引用的旧图片在一天后清理。
 
 B站使用公开热门接口，YouTube 使用 NASA RSS，Netflix 使用官方周榜并匹配 TVmaze 封面，Apple TV 使用官方公开片单。这些公开目录不代表个人推荐、播放历史或本地区完整片库。网页端点可能变化，首次获取失败时保留应用图标。TVmaze 归属入口位于内容来源面板，素材权利见 `app/ASSETS.md`。
+
+## 1.5.4 内容来源重构、海报轮播与滚动性能
+
+“内容来源”由 `app/content.js` 和 `app/sources.css` 组成。按 Impeccable Operate 模式重构，服务提供各来源的状态、条数、更新时间和失败原因，前端映射为已更新、缓存、刷新失败、未配置四种状态。列表项采用高对比度来源卡片，配置专属品牌图标，并集中第三方法律署名。
+
+海报列表支持停顿时每 10 秒平滑轮播下一部作品（Carousel Auto-advance），标题、标签与简介同步联动；光标移动立即重置轮播。左侧菜单采用 120ms 海报防抖与 DOM 缓存，消除快速连按时的大图并发解码和强制 Reflow，列表平移时间缩短为 200ms。
+
+系统 Home 模式下，`service/return-origin.js` 持续监听前台转换并具备断线重连机制，在应用退出后自动拉起稳定桌面；`as-home.sh` 保留底层合法物理输入源，不再污染 `lastInputApp`。

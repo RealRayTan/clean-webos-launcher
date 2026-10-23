@@ -135,3 +135,15 @@ HDMI 标签目前使用文字色标，不引入 FreeMyTV 的品牌 logo 素材�
 1.5.3 的内容服务随后增加 SOCKS5 支持：读取 Alcyone 配置中的 loopback SOCKS 端口，只对 YouTube、Netflix、TMDB 使用代理，B 站和 Apple TV 直连；不读取 Alcyone 的出站节点或凭据。第一次安装后手动强制刷新时，B 站、Apple TV、Netflix、Prime/TMDB 均为 live；YouTube 仍失败，原因是封面缩略图域名 `i.ytimg.com` 没有走代理。把 `ytimg.com` 加入代理域名后重新安装并再次强制刷新，五个来源全部为 live：B 站、Apple TV、Netflix、Prime/TMDB、YouTube 的 `fetchedAt` 均为 12:59，YouTube 首条为 NASA 直播。之前“只有 B 站更新”的直接网络原因由此闭环。
 
 代理不可用时是否保留缓存、5 分钟自动周期在 VPN 下的稳定性尚未单独复验；这次确认的是手动强制刷新和 Alcyone 连接状态。
+
+## 24147fa 退出应用黑屏与按键无反应修复实机验收
+
+2026-10-23 实机验证退出黑屏与按键无响应问题：
+1. 查明黑屏由三层叠加所致：
+   - `lastInputApp` 被设为非法的 `com.webos.app.home`，导致底层输入管线崩溃；
+   - `as-home.sh` 对 Web App 的 appinfo 错误写入了 `class: { hidden: true }`，导致 WebAppMgr 无法渲染可见图层；
+   - `service._returnForeground` 订阅在 `sam` 重启后丢失且未重连，同时对 OLED 电视无信号时的 `Screen Saver` 状态误判为休眠，导致应用退出后拉回逻辑未触发。
+2. 修复后推送到电视并完成实机验收：
+   - 电视前台启动哔哩哔哩（pid 28682），关闭应用退出后，后台服务监听到前台变空并在 0.5 秒内自动调用 `launch` 拉回桌面，实机截图显示 15:24 完美彩色海报桌面（伊莫壁纸），无黑屏、无崩溃；
+   - 遥控器短按 HOME 键测试：在应用前台触发短按 Home 后，电视立即平滑切回桌面（截图 15:25），HOME 键唤起正常；
+   - 全部 35 项本地自动化测试均保持通过。

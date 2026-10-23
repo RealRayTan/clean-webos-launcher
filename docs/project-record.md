@@ -73,3 +73,10 @@
 这次沿用系统 Home 的做法，新增一个 `defaultWindowType: screenSaver` 的独立 web app，bind mount 覆盖 LG 屏保目录，并注册启动钩子。屏保页的任意键退出通过受限的电视端 `closeApp` 服务完成，不再依赖手动启动时并不存在的系统按键关闭路径。`screensaver_mode.py` 可以单独恢复原厂屏保。
 
 手动用应用管理器启动屏保时，Back 和 Home 没有退出，最后重启电视恢复；这次失败说明屏保必须按系统启动路径验收，不能把手动启动当成通过。重新挂载后按真实空闲路径复用一次：3 分钟后系统自动显示纯黑浮动时钟，按方向键立即回到桌面，自动入口和任意键退出均通过。动态封面方面，B 站和 Apple TV 能直连更新，YouTube、Netflix 和 TMDB 在电视当前网络下分别超时、403 和超时；这是网络可达性，不是 TTL 失效。电视上手动连接 Alcyone 后，服务进程的直连请求仍未走应用级网络路径，三家继续失败；检查发现 Alcyone 提供 loopback SOCKS，于是给内容服务增加只针对这三家的 SOCKS5 请求路径。安装后手动刷新确认 B 站、Apple TV、Netflix、Prime/TMDB 均为 live；YouTube 的缩略图域名 `i.ytimg.com` 仍走直连而失败。把 `ytimg.com` 补进代理域名后重新安装并再刷新，五个来源全部为 live。该细节说明只代理“源站”不够，缩略图 CDN 也要走同一条路径。代理不可用时的缓存保留和 VPN 下的 5 分钟自动周期尚未单独复验。
+
+## 修复退出应用黑屏与 HOME 键无响应
+
+分析 commit `24147fa` 遗留的退出黑屏问题，查明由三处问题叠加产生：
+1. `as-home.sh` 将系统设置中的 `lastInputApp` 设置为桌面 ID，违反了 External Input Manager 只接受物理输入源的约束，导致应用退出时尝试切向非法输入源而黑屏；同时为系统 Home 的 appinfo 错误写入了 `class: { hidden: true }`，导致 WebAppMgr 将其作为无界面进程处理；
+2. 系统 Home 模式下 `return-origin.js` 被停用，且订阅未处理 `sam` 重启断连，同时将无信号状态下的 `Screen Saver` 误判为休眠而放弃拉回；
+3. 将桌面真实拉起目标确定为受 LSM 稳定合成支持的 `com.gathin.tvhome`，并在应用退出检测、断线自动重连和 HOME 键唤起链路上补齐兜底。实机部署后经哔哩哔哩退出和 HOME 键触发，电视均平滑秒级回到彩色海报桌面。

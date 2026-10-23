@@ -79,6 +79,7 @@
   } catch (error) {}
   var items = [], index = 0, zone = 'list', menuIndex = 0, offset = 0;
   var frontIndex = 0, frontImage = '', coverKey = '', pending = null, fadeTimer = 0, requestId = 0;
+  var rowNodes = [], coverDebounceTimer = 0, carouselTimer = 0, subIndex = 0;
   var preloads = {}, COVER_FADE_MS = 600;
   var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
   var dialogType = '', returnZone = 'list', loadingApps = false, lastLaunch = 0, toastTimer;
@@ -188,13 +189,18 @@
       track.appendChild(row);
     });
     focusLine = document.createElement('div'); focusLine.className = 'focus-line'; focusLine.setAttribute('aria-hidden', 'true'); track.appendChild(focusLine);
+    rowNodes = Array.prototype.slice.call(track.querySelectorAll('.row'));
     updateList(); updateCover(); updateZones();
   }
-  function rows() { return Array.prototype.slice.call(track.querySelectorAll('.row')); }
+  function rows() { return rowNodes.length ? rowNodes : Array.prototype.slice.call(track.querySelectorAll('.row')); }
   function setIndex(next) {
+    if (next === index) return;
     index = Math.max(0, Math.min(items.length - 1, next));
     zone = 'list';
-    updateList(); updateCover(); updateZones();
+    updateList(); updateZones();
+    clearTimeout(coverDebounceTimer);
+    resetCarousel();
+    coverDebounceTimer = setTimeout(updateCoverImmediate, 120);
   }
   function updateList() {
     offset = Math.max(0, Math.min(index - 3, items.length - 6));
@@ -224,9 +230,11 @@
     }
   }
 
-  function contentFor(app) {
+  function contentFor(app, itemOffset) {
     var list = window.PublicContent ? PublicContent.items(app.id) : [];
-    return list && list.length ? list[0] : null;
+    if (!list || !list.length) return null;
+    var idx = (itemOffset != null ? itemOffset : subIndex) % list.length;
+    return list[idx];
   }
   function coverState() {
     var app = items[index] || { id: computer, name: '电脑', meta: 'HDMI 4', fallback: wallpaperSrc(), desc: '切换到电脑输入源' };
@@ -245,7 +253,7 @@
   }
   function preloadCovers() {
     items.forEach(function (app) {
-      var item = contentFor(app);
+      var item = contentFor(app, 0);
       if (!item || preloads[item.image]) return;
       preloads[item.image] = true;
       var image = new Image(); image.src = item.image;
@@ -258,7 +266,29 @@
       if (image.decode) image.decode().catch(function () {});
     });
   }
+  function resetCarousel() {
+    clearTimeout(carouselTimer); carouselTimer = 0; subIndex = 0;
+    scheduleCarousel();
+  }
+  function scheduleCarousel() {
+    clearTimeout(carouselTimer);
+    if (document.hidden || !overlay.hidden || zone !== 'list') return;
+    var app = items[index];
+    var list = (app && window.PublicContent) ? PublicContent.items(app.id) : [];
+    if (!list || list.length <= 1) return;
+    carouselTimer = setTimeout(function () {
+      if (document.hidden || !overlay.hidden || zone !== 'list') return;
+      subIndex = (subIndex + 1) % list.length;
+      updateCoverImmediate();
+      scheduleCarousel();
+    }, 10000);
+  }
   function updateCover() {
+    clearTimeout(coverDebounceTimer);
+    updateCoverImmediate();
+    scheduleCarousel();
+  }
+  function updateCoverImmediate() {
     preloadCovers();
     var next = coverState();
     var key = next.app.id + '|' + next.src + '|' + next.title + '|' + next.text;
@@ -273,10 +303,11 @@
     incoming.style.transition = 'none'; incoming.style.opacity = '1';
     outgoing.style.transition = 'none'; outgoing.style.opacity = '0';
     outgoing.classList.remove('is-visible');
-    void incoming.offsetWidth;
-    incoming.style.transition = ''; outgoing.style.transition = '';
-    incoming.style.opacity = ''; outgoing.style.opacity = '';
-    frontIndex = pending.index; frontImage = pending.image; pending = null;
+    requestAnimationFrame(function () {
+      incoming.style.transition = ''; outgoing.style.transition = '';
+      incoming.style.opacity = ''; outgoing.style.opacity = '';
+      frontIndex = pending.index; frontImage = pending.image; pending = null;
+    });
   }
   function markMedia(layer, card) {
     var portrait = card.naturalHeight > card.naturalWidth;
@@ -316,11 +347,13 @@
       incoming.style.transition = 'none'; incoming.style.opacity = '0';
       incoming.classList.remove('is-visible'); incoming.style.zIndex = '2';
       layers[frontIndex].style.zIndex = '1';
-      void incoming.offsetWidth;
-      incoming.style.transition = ''; incoming.style.opacity = '';
-      pending = { index: incomingIndex, image: cover.src, state: cover };
-      incoming.classList.add('is-visible');
-      fadeTimer = setTimeout(finishFade, motionQuery && motionQuery.matches ? 0 : COVER_FADE_MS + 40);
+      requestAnimationFrame(function () {
+        if (id !== requestId) return;
+        incoming.style.transition = ''; incoming.style.opacity = '';
+        pending = { index: incomingIndex, image: cover.src, state: cover };
+        incoming.classList.add('is-visible');
+        fadeTimer = setTimeout(finishFade, motionQuery && motionQuery.matches ? 0 : COVER_FADE_MS + 40);
+      });
     });
   }
   function retargetFade(cover) {
@@ -427,8 +460,10 @@
     overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; resetKeys();
     zone = returnZone || 'list'; updateZones();
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    scheduleCarousel();
   }
   function openDialog(type, key) {
+    clearTimeout(carouselTimer);
     if (overlay.hidden) returnZone = zone;
     overlay.hidden = false; dialogType = type; body.innerHTML = ''; body.scrollTop = 0; panel.dataset.view = type;
     $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', devices: '输入源标签' }[type];
@@ -614,7 +649,7 @@
   document.addEventListener('focusin', function (event) { keepPanelFocusVisible(event.target); });
 
   document.addEventListener('keydown', function (event) {
-    var key = event.key || ({ 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 27: 'Escape', 461: 'Escape' })[event.keyCode] || '';
+    var key = event.key || ({ 37: 'ArrowLeft', 38: 'ArrowUp', 39: 'ArrowRight', 40: 'ArrowDown', 13: 'Enter', 27: 'Escape', 461: 'Escape', 83: 's', 77: 'm' })[event.keyCode] || '';
     if (!overlay.hidden) {
       if (key.indexOf('Arrow') === 0) {
         event.preventDefault();
@@ -652,6 +687,8 @@
       else if (zone === 'menu') { event.preventDefault(); zone = 'list'; updateZones(); }
     } else if (key.toLowerCase() === 'm') {
       event.preventDefault(); openDialog('manage');
+    } else if (key.toLowerCase() === 's') {
+      event.preventDefault(); openDialog('sources');
     }
   });
   document.addEventListener('keyup', function (event) {
@@ -668,9 +705,19 @@
     updateList(); updateCover(); updateZones();
     refreshApps(false); refreshVpn();
   }
-  document.addEventListener('webOSRelaunch', resume);
+  function handleParams(raw) {
+    try {
+      var p = typeof raw === 'string' ? JSON.parse(raw) : (raw || {});
+      if (p.dialog) openDialog(p.dialog);
+    } catch (e) {}
+  }
+  if (window.PalmSystem && window.PalmSystem.launchParams) handleParams(window.PalmSystem.launchParams);
+  document.addEventListener('webOSRelaunch', function () {
+    resume();
+    if (window.PalmSystem && window.PalmSystem.launchParams) handleParams(window.PalmSystem.launchParams);
+  });
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden) { resetKeys(); vpnRequest++; }
+    if (document.hidden) { resetKeys(); vpnRequest++; clearTimeout(carouselTimer); }
     else resume();
   });
   window.addEventListener('blur', resetKeys); window.addEventListener('resize', fit);

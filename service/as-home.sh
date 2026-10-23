@@ -27,6 +27,8 @@ mkdir -p "$SRC/content-cache"
 ln -sfn "$SRC/content-cache" "$TMP/content-cache"
 
 # The copy must present LG Home's app id to the application manager.
+# It must NOT have class.hidden; a web app with class.hidden is treated as headless
+# by WebAppMgr and will render a pitch black screen.
 "$NODE" - "$TMP/appinfo.json" <<'EOF'
 var fs = require('fs'), file = process.argv[2];
 var app = JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -35,7 +37,7 @@ app.title = 'Home';
 app.visible = false;
 app.appCategory = ['home'];
 app.handlesRelaunch = true;
-app.class = Object.assign({}, app.class || {}, { hidden: true });
+delete app.class;
 fs.writeFileSync(file, JSON.stringify(app, null, 2));
 EOF
 grep -q '"com.webos.app.home"' "$TMP/appinfo.json" || { echo "appinfo rewrite failed" >"$LOG"; exit 0; }
@@ -69,6 +71,7 @@ EOF
 fi
 
 systemctl restart sam >>"$LOG" 2>&1 && echo "restarted sam" >>"$LOG"
+pkill -9 -f app-id=com.webos.app.home >>"$LOG" 2>&1 || true
 
 SVC=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh
 [ -f "$SVC" ] && sh "$SVC" </dev/null >/dev/null 2>&1 && echo "started launcher service" >>"$LOG"
@@ -78,8 +81,46 @@ if [ ! -f "$ORIG" ]; then
   luna-send -n 1 -w 5000 luna://com.webos.settingsservice/getSystemSettings \
     '{"category":"general","keys":["lastInputApp","physicalLastInputApp","homeAutoLaunch"]}' >"$ORIG" 2>/dev/null || true
 fi
-luna-send -n 1 -w 5000 luna://com.webos.settingsservice/setSystemSettings \
-  '{"category":"general","settings":{"lastInputApp":"com.webos.app.home","physicalLastInputApp":"com.webos.app.home","homeAutoLaunch":"off"}}' >/dev/null 2>&1 \
-  && echo "boot input set to launcher" >>"$LOG"
+
+# Ensure homeAutoLaunch is off so LG stock home does not launch over the desktop.
+# Never point lastInputApp at a launcher app: webOS input services only accept physical
+# inputs (HDMI / LiveTV). Setting a launcher app as lastInputApp breaks the video pipeline
+# and causes black screens on app exit.
+"$NODE" <<'EOF'
+var fs = require('fs'), execSync = require('child_process').execSync;
+var origFile = '/var/lib/lg-c5-home/boot-input.orig';
+var logFile = '/tmp/gathin-home-as-home.log';
+function log(msg) { try { fs.appendFileSync(logFile, msg + '\n'); } catch (e) {} }
+
+try {
+  var res = execSync("luna-send -n 1 -w 4000 luna://com.webos.settingsservice/getSystemSettings '{\"category\":\"general\",\"keys\":[\"lastInputApp\",\"physicalLastInputApp\",\"homeAutoLaunch\"]}'", { encoding: 'utf8' });
+  var current = JSON.parse(res);
+  var settings = (current && current.settings) || {};
+  var lastApp = settings.lastInputApp || '';
+  var isInvalidInput = lastApp === 'com.webos.app.home' || lastApp === 'com.gathin.tvhome';
+
+  var newSettings = { homeAutoLaunch: 'off' };
+  if (isInvalidInput) {
+    var restoreApp = null;
+    if (fs.existsSync(origFile)) {
+      try {
+        var orig = JSON.parse(fs.readFileSync(origFile, 'utf8'));
+        var candidate = (orig.settings && orig.settings.lastInputApp) || '';
+        if (/^com\.webos\.app\.(hdmi[1-4]|livetv)$/.test(candidate)) restoreApp = candidate;
+      } catch (e) {}
+    }
+    if (!restoreApp) restoreApp = 'com.webos.app.hdmi4';
+    newSettings.lastInputApp = restoreApp;
+    newSettings.physicalLastInputApp = restoreApp;
+    log('recovering lastInputApp from ' + lastApp + ' to ' + restoreApp);
+  }
+
+  var payload = JSON.stringify({ category: 'general', settings: newSettings });
+  execSync("luna-send -n 1 -w 5000 luna://com.webos.settingsservice/setSystemSettings " + JSON.stringify(payload), { stdio: 'ignore' });
+  log('system settings updated: homeAutoLaunch=off' + (newSettings.lastInputApp ? ' lastInputApp=' + newSettings.lastInputApp : ''));
+} catch (error) {
+  log('system settings update error: ' + error.message);
+}
+EOF
 echo "launcher mounted as system Home" >>"$LOG"
 exit 0
