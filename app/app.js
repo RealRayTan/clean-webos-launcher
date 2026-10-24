@@ -284,13 +284,12 @@
 
     var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
     if (useGSAP) {
-      gsap.killTweensOf([nextLayer, prevLayer, nextBg]);
+      gsap.killTweensOf([nextLayer, prevLayer]);
       nextLayer.classList.add('is-visible');
-      gsap.fromTo(nextBg, { scale: 1.06 }, { scale: 1.02, duration: 0.8, ease: 'power2.out' });
       gsap.fromTo(nextLayer, { opacity: 0 }, {
         opacity: 1,
-        duration: 0.45,
-        ease: 'power2.inOut',
+        duration: 0.35,
+        ease: 'power2.out',
         onComplete: function () {
           prevLayer.classList.remove('is-visible');
           gsap.set(prevLayer, { opacity: 0 });
@@ -342,13 +341,6 @@
       var isFocused = (cinemaFocus === 'shelf' && i === cinemaIndex);
       card.classList.toggle('focus', isFocused);
       card.setAttribute('aria-selected', String(i === cinemaIndex));
-      if (useGSAP) {
-        if (isFocused) {
-          gsap.to(card, { scale: 1.05, y: -6, opacity: 1, duration: 0.22, ease: 'power2.out', overwrite: 'auto' });
-        } else {
-          gsap.to(card, { scale: 1.0, y: 0, opacity: 0.72, duration: 0.22, ease: 'power2.out', overwrite: 'auto' });
-        }
-      }
     });
 
     if (cinemaFocus === 'shelf') updateCinemaTopFocus();
@@ -362,13 +354,6 @@
       cinemaDate.textContent = item.releaseDate || '';
       cinemaDesc.textContent = item.overview || '暂无剧情简介。';
 
-      if (useGSAP) {
-        var metaItems = [cinemaScore, cinemaGenre, cinemaDate, cinemaTitle, cinemaOrigin, cinemaDesc];
-        gsap.fromTo(metaItems,
-          { opacity: 0.25, y: 7 },
-          { opacity: 1, y: 0, duration: 0.28, stagger: 0.02, ease: 'power2.out', overwrite: 'auto' }
-        );
-      }
       setCinemaBackdrop(item.backdrop, skipAnimation);
     }
   }
@@ -521,18 +506,26 @@
     if (captionTitle.textContent === title && captionText.textContent === text) return;
     captionTitle.textContent = title; captionText.textContent = text;
   }
+  var preloadScheduled = false;
+  function schedulePreload() {
+    if (preloadScheduled) return;
+    preloadScheduled = true;
+    setTimeout(function () {
+      preloadScheduled = false;
+      preloadCovers();
+    }, 800);
+  }
   function preloadCovers() {
-    items.forEach(function (app) {
+    var targets = [];
+    [-1, 1, 2].forEach(function (delta) {
+      var app = items[index + delta];
+      if (app) targets.push(app);
+    });
+    targets.forEach(function (app) {
       var item = contentFor(app, 0);
       if (!item || preloads[item.image]) return;
       preloads[item.image] = true;
       var image = new Image(); image.decoding = 'async'; image.src = item.image;
-      if (image.decode) image.decode().catch(function () {});
-    });
-    [wallpaperSrc(), 'assets/valley.jpg', 'assets/peaks.jpg'].forEach(function (src) {
-      if (preloads[src]) return;
-      preloads[src] = true;
-      var image = new Image(); image.decoding = 'async'; image.src = src;
       if (image.decode) image.decode().catch(function () {});
     });
   }
@@ -559,7 +552,7 @@
     scheduleCarousel();
   }
   function updateCoverImmediate() {
-    preloadCovers();
+    schedulePreload();
     var next = coverState();
     var key = next.app.id + '|' + next.src + '|' + next.title + '|' + next.text;
     if (key === coverKey) return;
@@ -728,6 +721,7 @@
   }
   function closeDialog() {
     if (dialogType === 'sources') { openDialog('settings', 'sources'); return; }
+    delete scene.dataset.dialogOpen;
     overlay.hidden = true; dialogType = ''; orderDraft = null; movingId = null; resetKeys();
     zone = returnZone || 'list'; updateZones();
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -736,6 +730,7 @@
   function openDialog(type, key) {
     clearTimeout(carouselTimer);
     if (overlay.hidden) returnZone = zone;
+    scene.dataset.dialogOpen = 'true';
     overlay.hidden = false; dialogType = type; body.innerHTML = ''; body.scrollTop = 0; panel.dataset.view = type;
     $('dialog-title').textContent = { all: '全部应用', manage: '编辑桌面', order: '调整首页顺序', settings: '设置', sources: '内容来源', inputs: '选择输入源', devices: '输入源标签', weather: '天气与日落' }[type];
     if (type === 'all' || type === 'manage') renderCatalog(type === 'manage');

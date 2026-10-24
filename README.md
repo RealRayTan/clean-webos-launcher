@@ -4,7 +4,7 @@
 
 为已 root 的 LG webOS 电视提供海报列表中文桌面。桌面以 bind mount 挂成系统 Home，应用退出、短按 Home 和开机都会直接回到它，不再先闪一下 LG 原厂首页；待机唤醒后恢复上次使用的桌面或 HDMI 输入源。桌面跑在电视上，不需要电脑常开。
 
-前端起点是 [webos-vibehack](https://github.com/OmkarK97/webos-vibehack)，本项目增加中文字体回退、电视端按键助手、海报列表首页、系统 Home 挂载、系统屏保替换和共享桌面状态。当前源码与实机版本为 **1.5.4**。
+前端起点是 [webos-vibehack](https://github.com/OmkarK97/webos-vibehack)，本项目增加中文字体回退、电视端按键助手、海报列表首页、系统 Home 挂载、系统屏保替换和共享桌面状态。当前源码与实机版本为 **1.5.5**。
 
 ## 安装
 
@@ -12,7 +12,7 @@
 
 已 root 的电视使用 **root SSH 的 22 端口** 安装，不走 webOS Developer Mode 的 9922 端口。安装脚本会把桌面挂成系统 Home、把独立屏保页挂成系统屏保，并把桌面状态同步给 Home 副本；短按 Home 或从应用退出都会直接回到桌面。
 
-需要暂时恢复 LG 原厂 Home 和原厂屏保时使用 `tools/desktop_mode.py off`，再执行 `on` 恢复。只恢复原厂屏保可使用 `tools/screensaver_mode.py off`。停用只移除挂载和启动钩子，不卸载应用，也不影响 root。
+需要暂时恢复 LG 原厂 Home 和原厂屏保时使用 `tools/desktop_mode.py off`，再执行 `on` 恢复。只恢复原厂屏保可使用 `tools/screensaver_mode.py off`。停用只移除挂载和启动钩子，不卸载应用，也不影响 root。系统性能分析与瘦身可使用 `tools/profile.py` 与 `tools/debloat.py`。
 
 ## 界面
 

@@ -4,7 +4,7 @@
 
 A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.4**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.5**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 
@@ -12,7 +12,7 @@ The TV must be rooted, with Homebrew Channel installed and SSH key login configu
 
 A rooted TV installs over **root SSH on port 22**, not the webOS Developer Mode port 9922. The installer mounts the launcher as the system Home, mounts the standalone screen saver over LG's screen-saver app, and syncs the launcher state into the Home copy. A short Home press or an app exit lands directly on the desktop.
 
-To restore LG stock Home and the stock screen saver temporarily, run `tools/desktop_mode.py off`; run `on` to re-enable. To restore only the stock screen saver, run `tools/screensaver_mode.py off`. Disabling removes only the mounts and startup hooks; apps and root stay installed.
+To restore LG stock Home and the stock screen saver temporarily, run `tools/desktop_mode.py off`; run `on` to re-enable. To restore only the stock screen saver, run `tools/screensaver_mode.py off`. Disabling removes only the mounts and startup hooks; apps and root stay installed. System profiling and reversible debloating are supported via `tools/profile.py` and `tools/debloat.py`.
 
 ## Interface
 

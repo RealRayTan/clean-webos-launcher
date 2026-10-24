@@ -1,5 +1,14 @@
 # 版本变化
 
+## 1.5.5 — 2026-10-24
+
+- 剥离海报实时高斯模糊：移除 `poster.css` 中竖版海报的 `filter: blur(28px)` 与 `transform: scale(1.08)`，改用静态预调暗层（`brightness(0.28)`），彻底解决连续向下滚动触发竖版封面时的掉帧卡顿。
+- 消除内容弹窗 Overdraw：弹窗打开时给底层海报层标记 `visibility: hidden`，停止背景渲染管线并避免双重半透明合成；移除 `sources.css` 中 `@keyframes source-pulse` 缩放变换与小圆点阴影模糊。
+- 优化封面异步预加载：移除每次光标移动全量触发的大图并发解码，改为停止滚动 800ms 后仅对邻近 2–3 项按需后台预加载。
+- 新增量化基准工具 `tools/profile.py`：远程读取并输出电视的物理可用内存（`MemAvailable`）、桌面 PSS 占用、运行中应用列表、预加载策略以及 ACR/推广设置。
+- 新增系统级可逆瘦身工具 `tools/debloat.py`：支持 `status`、`plan`、`apply`、`restore`。停用 `lgchannels` 和内置浏览器驻留预加载，关闭 `livePlus`（ACR 屏幕指纹识别）与主页推广；通过 `/var/lib/webosbrew/init.d/50-debloat` 实现开机持久化与出厂无损复原。
+- 前端集成性能测试探针 `app/benchmark.js`：提供滑动性能自动化测试函数 `window.runScrollBenchmark()`，精确测量总帧数、平均 FPS、1% Low FPS、慢帧数与最长单帧耗时。
+
 ## 1.5.4 — 2026-10-23
 
 - 彻底修复应用退出黑屏问题：移除对系统 `lastInputApp` 的篡改，恢复合法物理输入源状态；移除系统 Home appinfo 中的 `class.hidden`；系统 Home 模式下恢复前台退出接管与断线自动重连，正确处理 OLED 电视无信号时的 `Screen Saver` 状态。
