@@ -226,6 +226,44 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
   transform: translateZ(0);
 }
 
+.trending-widget {
+  height: 46px;
+  margin-top: 4px;
+  padding: 0 16px;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 23px;
+  background: rgba(10, 13, 11, .18);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-size: 16px;
+  letter-spacing: .5px;
+  cursor: pointer;
+  transform: translateZ(0);
+  transition: background 160ms linear, border-color 160ms linear;
+  user-select: none;
+}
+
+.trending-widget svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
+.trending-widget:hover,
+.trending-widget.focus,
+.trending-widget:focus-visible {
+  border-color: var(--focus);
+  background: rgba(255, 255, 255, .1);
+  outline: none;
+}
+
+.trending-widget.focus {
+  background: var(--focus);
+  color: #18201a;
+}
+
 .weather-widget {
   height: 46px;
   margin-top: 4px;
@@ -765,6 +803,8 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
 .scene[data-theme="light"] .top-right,
 .scene[data-theme="light"] .caption{background:rgba(230,235,237,.68);border-color:rgba(28,33,36,.16)}
 .scene[data-theme="light"] .weather-widget{background:rgba(230,235,237,.68);border-color:rgba(28,33,36,.16);color:var(--ink)}
+.scene[data-theme="light"] .trending-widget{background:rgba(230,235,237,.68);border-color:rgba(28,33,36,.16);color:var(--ink)}
+.scene[data-theme="light"] .trending-widget.focus{background:var(--focus);color:#E6EBED}
 .scene[data-theme="light"] .weather-desc{color:var(--muted)}
 .scene[data-theme="light"] .cover-card{background:#D8DDE0;border-color:rgba(28,33,36,.18)}
 .scene[data-theme="light"] .theme-toggle{border-color:rgba(28,33,36,.18)}
@@ -789,6 +829,7 @@ body[data-scheme="hero"] .cover-layer.is-portrait .cover-card {
 .scene[data-theme="oled"] .cover-left{background:linear-gradient(90deg,#000 0%,#000 20%,rgba(0,0,0,.9) 32%,rgba(0,0,0,.4) 46%,transparent 62%)}
 .scene[data-theme="oled"] .menu-panel{background:#000;border-color:#262626;box-shadow:0 24px 70px rgba(0,0,0,.7)}
 .scene[data-theme="oled"] .weather-widget{background:rgba(10,10,10,.8);border-color:rgba(255,255,255,.18)}
+.scene[data-theme="oled"] .trending-widget{background:rgba(10,10,10,.8);border-color:rgba(255,255,255,.18)}
 .scene[data-theme="oled"] .theme-toggle{border-color:rgba(255,255,255,.18)}
 .scene[data-theme="oled"] .overlay{background:rgba(0,0,0,.78)}
 

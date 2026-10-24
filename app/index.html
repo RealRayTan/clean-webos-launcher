@@ -27,6 +27,16 @@
 
     <div class="wordmark">我的空间</div>
     <div class="top-right">
+      <button id="trendingBtn" class="trending-widget" type="button" data-key="trending" aria-label="探索热门影视">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 4m0 2a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2h-12a2 2 0 0 1 -2 -2z"/>
+          <path d="M4 9h16"/>
+          <path d="M4 15h16"/>
+          <path d="M9 4v16"/>
+          <path d="M15 4v16"/>
+        </svg>
+        <span>探索</span>
+      </button>
       <div id="weather" class="weather-widget" title="本地天气与日落" aria-label="本地天气">
         <span id="weatherIcon" class="weather-icon">☀️</span>
         <div class="weather-meta">
@@ -52,7 +62,6 @@
 
     <div id="menuPanel" class="menu-panel" hidden>
       <button class="menu-item" type="button" data-action="all">全部应用</button>
-      <button class="menu-item" type="button" data-action="trending">探索热门</button>
       <button class="menu-item" type="button" data-action="inputs">输入源</button>
       <button class="menu-item" type="button" data-action="network">网络连接<small id="vpnLabel">打开网络设置</small></button>
       <button class="menu-item" type="button" data-action="settings">设置</button>

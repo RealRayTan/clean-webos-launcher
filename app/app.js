@@ -17,6 +17,9 @@
   var cinemaStatusText = $('cinemaStatusText'), cinemaTrack = $('cinemaTrack');
   var cinemaTab = 'movie', cinemaIndex = 0, cinemaFocus = 'shelf', cinemaTopIndex = 1;
   var cinemaFrontIndex = 0, cinemaCardsData = [], cinemaCardNodes = [];
+  var cinemaDebounceTimer = 0, cinemaPreloads = {};
+  if (cinemaBgs[0]) cinemaBgs[0].decoding = 'async';
+  if (cinemaBgs[1]) cinemaBgs[1].decoding = 'async';
   var FALLBACK_TRENDING = {
     movie: [
       { id: 'm1', title: '沙丘 2', originalTitle: 'Dune: Part Two (2024)', score: '★ 8.8', votes: '12.4k人评', releaseDate: '2024-03-01', genre: '科幻 · 冒险 · 剧情', overview: '保罗·厄崔迪携手契妮和弗雷曼人，对摧毁其家族的阴谋者展开残酷复仇。', backdrop: 'assets/valley.jpg', poster: 'assets/valley.jpg' },
@@ -103,7 +106,7 @@
       else state.apps = defaults.filter(function (id) { return hidden.indexOf(id) < 0; });
     }
   } catch (error) {}
-  var items = [], index = 0, zone = 'list', menuIndex = 0, offset = 0;
+  var items = [], index = 0, zone = 'list', menuIndex = 0, offset = 0, topRightIndex = 0;
   var frontIndex = 0, frontImage = '', coverKey = '', pending = null, fadeTimer = 0, requestId = 0;
   var rowNodes = [], coverDebounceTimer = 0, carouselTimer = 0, subIndex = 0;
   var preloads = {}, COVER_FADE_MS = 600;
@@ -256,13 +259,16 @@
     menuEl.classList.toggle('focus', inMenu);
     panelEl.hidden = zone !== 'panel';
     panelButtons.forEach(function (button, i) { button.classList.toggle('focus', zone === 'panel' && i === menuIndex); });
+    var tb = $('trendingBtn'), we = $('weather'), th = $('theme');
+    if (tb) tb.classList.toggle('focus', zone === 'top-right' && topRightIndex === 0);
+    if (we) we.classList.toggle('focus', zone === 'top-right' && topRightIndex === 1);
+    if (th) th.classList.toggle('focus', zone === 'top-right' && topRightIndex === 2);
   }
   function openPanel() { zone = 'panel'; menuIndex = 0; updateZones(); }
   function closePanel() { zone = 'menu'; updateZones(); }
   function act(action) {
     zone = 'menu'; updateZones();
     if (action === 'all') { openDialog('all'); refreshApps(false); }
-    else if (action === 'trending') openCinema();
     else if (action === 'inputs') openDialog('inputs');
     else if (action === 'settings') openDialog('settings');
     else if (action === 'network') {
@@ -312,25 +318,63 @@
     cinemaTabTv.setAttribute('aria-selected', String(cinemaTab === 'tv'));
   }
 
+  function preloadCinemaMedia() {
+    if (!cinemaCardsData || !cinemaCardsData.length) return;
+    for (var i = 0; i < Math.min(cinemaCardsData.length, 6); i++) {
+      var it = cinemaCardsData[i];
+      if (it.backdrop && !cinemaPreloads[it.backdrop]) {
+        cinemaPreloads[it.backdrop] = true;
+        var bImg = new Image(); bImg.decoding = 'async'; bImg.src = it.backdrop;
+        if (bImg.decode) bImg.decode().catch(function () {});
+      }
+      if (it.poster && !cinemaPreloads[it.poster]) {
+        cinemaPreloads[it.poster] = true;
+        var pImg = new Image(); pImg.decoding = 'async'; pImg.src = it.poster;
+        if (pImg.decode) pImg.decode().catch(function () {});
+      }
+    }
+  }
+
+  function updateCinemaStageContent(skipAnimation) {
+    var item = cinemaCardsData[cinemaIndex];
+    if (!item) return;
+    cinemaTitle.textContent = item.title;
+    cinemaOrigin.textContent = item.originalTitle ? '原名：' + item.originalTitle : '';
+    cinemaScore.textContent = item.score + (item.votes ? ' (' + item.votes + ')' : '');
+    cinemaGenre.textContent = item.genre || '影视档案';
+    cinemaDate.textContent = item.releaseDate || '';
+    cinemaDesc.textContent = item.overview || '暂无剧情简介。';
+
+    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
+    if (useGSAP) {
+      var metaItems = [cinemaScore, cinemaGenre, cinemaDate, cinemaTitle, cinemaOrigin, cinemaDesc];
+      gsap.fromTo(metaItems,
+        { opacity: 0.35, y: 5 },
+        { opacity: 1, y: 0, duration: 0.24, stagger: 0.015, ease: 'power2.out', overwrite: 'auto' }
+      );
+    }
+    setCinemaBackdrop(item.backdrop, skipAnimation);
+  }
+
   function setCinemaIndex(next, skipAnimation) {
     if (!cinemaCardsData.length) return;
     cinemaIndex = Math.max(0, Math.min(cinemaCardsData.length - 1, next));
 
     // Centered windowing calculation:
-    // Viewport width 1696px, 310px width + 20px gap = 330px per item
-    // 5 cards fit fully. Keep 2 items on the left when possible to center focus in slot 2.
-    var visibleSlots = 5;
+    // Viewport width 1728px, 140px width + 24px gap = 164px per item
+    var slotWidth = 164;
+    var visibleSlots = Math.floor(1728 / slotWidth);
     var maxOffset = Math.max(0, cinemaCardsData.length - visibleSlots);
     var targetOffset = Math.max(0, Math.min(cinemaIndex - 2, maxOffset));
-    var targetX = -(targetOffset * 330);
+    var targetX = -(targetOffset * slotWidth);
 
     var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
 
     if (useGSAP) {
       gsap.to(cinemaTrack, {
         x: targetX,
-        duration: 0.38,
-        ease: 'power3.out',
+        duration: 0.18,
+        ease: 'power2.out',
         overwrite: 'auto'
       });
     } else {
@@ -345,16 +389,13 @@
 
     if (cinemaFocus === 'shelf') updateCinemaTopFocus();
 
-    var item = cinemaCardsData[cinemaIndex];
-    if (item) {
-      cinemaTitle.textContent = item.title;
-      cinemaOrigin.textContent = item.originalTitle ? '原名：' + item.originalTitle : '';
-      cinemaScore.textContent = item.score + (item.votes ? ' (' + item.votes + ')' : '');
-      cinemaGenre.textContent = item.genre || '影视档案';
-      cinemaDate.textContent = item.releaseDate || '';
-      cinemaDesc.textContent = item.overview || '暂无剧情简介。';
-
-      setCinemaBackdrop(item.backdrop, skipAnimation);
+    clearTimeout(cinemaDebounceTimer);
+    if (skipAnimation) {
+      updateCinemaStageContent(true);
+    } else {
+      cinemaDebounceTimer = setTimeout(function () {
+        updateCinemaStageContent(false);
+      }, 110);
     }
   }
 
@@ -374,13 +415,7 @@
       card.className = 'cinema-card';
       card.setAttribute('role', 'option');
       card.setAttribute('aria-label', item.title + '，' + item.score);
-      card.innerHTML =
-        '<div class="cinema-card-thumb"><img src="' + item.poster + '" alt=""></div>' +
-        '<div class="cinema-card-info">' +
-          '<div class="cinema-card-score">' + item.score + '</div>' +
-          '<div class="cinema-card-name">' + item.title + '</div>' +
-          '<div class="cinema-card-sub">' + (item.genre || item.releaseDate) + '</div>' +
-        '</div>';
+      card.innerHTML = '<img src="' + item.poster + '" decoding="async" alt="' + item.title + '">';
       card.addEventListener('click', function () {
         cinemaFocus = 'shelf';
         setCinemaIndex(i);
@@ -388,6 +423,7 @@
       cinemaTrack.appendChild(card);
       cinemaCardNodes.push(card);
     });
+    preloadCinemaMedia();
     setCinemaIndex(cinemaIndex, skipAnimation);
   }
 
@@ -459,8 +495,10 @@
   }
 
   function closeCinema() {
+    clearTimeout(cinemaDebounceTimer);
     var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches);
     if (useGSAP) {
+      gsap.killTweensOf([cinemaView, cinemaTrack]);
       gsap.to(cinemaView, {
         opacity: 0,
         scale: 0.98,
@@ -477,7 +515,8 @@
         if (zone !== 'cinema') cinemaView.hidden = true;
       }, 280);
     }
-    zone = 'panel';
+    zone = 'top-right';
+    topRightIndex = 0;
     updateZones();
   }
 
@@ -1045,19 +1084,48 @@
       if (zone === 'list') { if (index < items.length - 1) setIndex(index + 1); else { zone = 'menu'; updateZones(); } }
       else if (zone === 'menu') openPanel();
       else if (zone === 'panel') { menuIndex = Math.min(panelButtons.length - 1, menuIndex + 1); updateZones(); }
+      else if (zone === 'top-right') { zone = 'list'; updateZones(); }
     } else if (key === 'ArrowUp') {
       event.preventDefault();
       if (zone === 'list') { if (index > 0) setIndex(index - 1); }
       else if (zone === 'panel') { if (menuIndex > 0) { menuIndex--; updateZones(); } else { zone = 'menu'; updateZones(); } }
       else if (zone === 'menu') { zone = 'list'; updateZones(); }
+      else if (zone === 'top-right') { zone = 'list'; updateZones(); }
+    } else if (key === 'ArrowRight') {
+      if (zone === 'list') {
+        event.preventDefault();
+        zone = 'top-right';
+        topRightIndex = 0;
+        updateZones();
+      } else if (zone === 'top-right') {
+        event.preventDefault();
+        topRightIndex = Math.min(2, topRightIndex + 1);
+        updateZones();
+      }
+    } else if (key === 'ArrowLeft') {
+      if (zone === 'top-right') {
+        event.preventDefault();
+        if (topRightIndex > 0) {
+          topRightIndex--;
+          updateZones();
+        } else {
+          zone = 'list';
+          updateZones();
+        }
+      }
     } else if (key === 'Enter') {
       event.preventDefault(); if (okDown) return; okDown = true;
       if (zone === 'list') launch(items[index].id);
       else if (zone === 'menu') openPanel();
       else if (zone === 'panel') act(panelButtons[menuIndex].dataset.action);
+      else if (zone === 'top-right') {
+        if (topRightIndex === 0) openCinema();
+        else if (topRightIndex === 1) openDialog('weather');
+        else if (topRightIndex === 2) $('theme').click();
+      }
     } else if (key === 'Escape' || key === 'Backspace' || event.keyCode === 461 || event.keyCode === 27) {
       if (zone === 'panel') { event.preventDefault(); closePanel(); }
-      else if (zone === 'menu') { event.preventDefault(); zone = 'list'; updateZones(); }
+      else if (zone === 'menu' || zone === 'top-right') { event.preventDefault(); zone = 'list'; updateZones(); }
     } else if (key.toLowerCase() === 'm') {
       event.preventDefault(); openDialog('manage');
     } else if (key.toLowerCase() === 's') {
@@ -1120,6 +1188,10 @@
   if (weatherWidgetEl) {
     weatherWidgetEl.style.cursor = 'pointer';
     weatherWidgetEl.onclick = function () { openDialog('weather'); };
+  }
+  var trendingBtnEl = $('trendingBtn');
+  if (trendingBtnEl) {
+    trendingBtnEl.onclick = openCinema;
   }
   setInterval(clock, 10000); setInterval(refreshVpn, 20000); setInterval(refreshWeather, 30 * 60 * 1000);
 }());
