@@ -119,7 +119,7 @@ bash -n scripts/build.sh service/autostart.sh service/as-home.sh service/screens
 - [流媒体动态片库设置](docs/streaming-catalog.md)
 - [实机验证记录](docs/verification.md)
 - [项目演进记录](docs/project-record.md)
-- [版本变更日志](CHANGELOG.md)
+- [版本变化](CHANGELOG.md)
 
 ## 上游与许可
 

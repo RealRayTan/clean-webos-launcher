@@ -14,7 +14,7 @@ python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 ```
 
-2. 设置自己的电视地址和 root SSH 密钥路径。
+2. 设置自己的电视地址和 root SSH 密钥路径。未提供时，工具自动回退读取本地 `~/.ssh/config` 中的 `Host lgtv` 别名免密连接。
 
 ```sh
 export TV_HOST='your-tv-address'
@@ -52,7 +52,7 @@ python3 scripts/prepare_native.py /absolute/path/to/native-artifact
 bash scripts/build.sh
 ```
 
-输出为 `build/com.gathin.tvhome_1.5.4_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
+输出为 `build/com.gathin.tvhome_1.5.8_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
 
 ## 安装并启用
 

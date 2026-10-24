@@ -53,7 +53,8 @@ The screenshots show layout only. System Home, the screen saver, the cold-stone 
 | Short Back inside an app | Keep the app's own back navigation |
 | Select "Clean RAM" in the menu | Drop Linux kernel PageCache and compact memory; toast shows freed memory |
 | TV idle for 5 minutes (on desktop/screensaver) | Daemon automatically drops cache quietly; paused during media playback or HDMI |
-| Disable the desktop (`desktop_mode.py off`) | Unmount the system Home and restore LG stock Home |
+| Disable the desktop (`desktop_mode.py off`) | Unmount the system Home and screen saver, restoring LG stock Home and screen saver |
+| Disable only the screen saver (`screensaver_mode.py off`) | Unmount the custom screen saver, restoring LG stock screen saver |
 
 Bilibili shows its own exit confirmation; confirming it returns directly to the custom desktop. YouTube AdFree and Alcyone consume short Back at the top level, so use long Back or Home to leave. Leaving the Alcyone screen does not disconnect the VPN tunnel.
 
