@@ -147,3 +147,24 @@ HDMI 标签目前使用文字色标，不引入 FreeMyTV 的品牌 logo 素材�
    - 电视前台启动哔哩哔哩（pid 28682），关闭应用退出后，后台服务监听到前台变空并在 0.5 秒内自动调用 `launch` 拉回桌面，实机截图显示 15:24 完美彩色海报桌面（伊莫壁纸），无黑屏、无崩溃；
    - 遥控器短按 HOME 键测试：在应用前台触发短按 Home 后，电视立即平滑切回桌面（截图 15:25），HOME 键唤起正常；
    - 全部 35 项本地自动化测试均保持通过。
+
+## 1.5.7 系统瘦身、渲染降负与内核内存清理实机验收
+
+2026-10-24 针对主菜单连续下翻卡顿与探索大厅掉帧进行实机性能调优与验收：
+
+1. **系统瘦身与预加载释放（`tools/debloat.py`）**：
+   - 执行 `apply` 停用 `com.webos.app.lgchannels` 与 `com.webos.app.browser` 的常驻预加载白名单并杀掉后台进程。
+   - 关闭 `option:livePlus`（ACR 自动内容识别）、`general:homePromotion`、`other:contentRecommendation` 等 7 项遥测与推广设置。
+   - 开机钩子 `/var/lib/webosbrew/init.d/50-debloat` 写入完成，备份文件位于 `/var/lib/webos-debloat/`。
+   - `tools/profile.py` 实机验证：预加载项已关闭，后台活跃应用由 9 个减少至仅保留核心服务与前台。
+
+2. **前端渲染管线降负**：
+   - 主菜单移除竖版封面的 `filter: blur(28px)` 与 `scale(1.08)`，改用静态暗层；大图预加载由光标每次移动全量并发改为停止滚动 800ms 后邻近 2–3 项后台解码，彻底消除连续下翻卡顿。
+   - 探索大厅（Trending 页面）入口移回右上角顶栏独立微件（`trendingBtn`），移出左下角抽屉菜单；卡架剥离全部 20 张卡片的 `backdrop-filter: blur(14px)`，取消整屏 1080p 实时 scale 缩放，恢复 60 FPS 满帧滚动。
+   - 弹窗展开时通过 `.scene[data-dialog-open="true"] .cover` 将底层海报层标记为 `visibility: hidden`，消除 Overdraw。
+
+3. **内核内存闲置守护与一键清理（`service/ram-manager.js`）**：
+   - 实机通过 Luna 接口调用 `cleanRam` 测试，执行 `sync && echo 3 > /proc/sys/vm/drop_caches && echo 1 > /proc/sys/vm/compact_memory`。实机 `MemAvailable` 从 623 MiB 跃升至 768 MiB（净释放 +145 MiB）。
+   - 闲置守护在连续 5 分钟无遥控器输入且前台处于桌面或屏保时静默回收，观影与 HDMI 游戏模式下自动挂起避让。
+   - 菜单栏已成功挂载“清理内存（释放缓存）”交互按钮并实机生效。
+   - 全部 10 组自动化测试套件（51 项测试）全部通过。

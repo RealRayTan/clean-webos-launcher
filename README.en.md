@@ -4,7 +4,7 @@
 
 A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.5**. The interface is in Chinese; this page is the English documentation.
+It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.7**. The interface is in Chinese; this page is the English documentation.
 
 ## Install
 
@@ -22,10 +22,11 @@ To restore LG stock Home and the stock screen saver temporarily, run `tools/desk
 
 The left side is a vertical list of the computer input and favourite apps. The focused app gets a dynamic cover:
 
-- Landscape covers run full-bleed. Portrait covers sit in a card at about 80% height on the right, over a blurred and darkened copy of the same image.
+- Landscape covers run full-bleed. Portrait covers sit in a card at about 80% height on the right over a static darkened background, eliminating GPU real-time blur stutters.
 - Covers crossfade with two layers. They do not slide sideways or stack when switching quickly.
 - The bottom-right caption shows the current title and a one-line description, with Chinese preferred.
-- The three-line menu at the bottom left holds all apps, inputs, network, and settings.
+- The three-line menu at the bottom left holds all apps, inputs, RAM cleaner, network, and settings.
+- The top-right header holds the Trending cinema exploration entrance, live local weather, theme toggle, and the clock. Press Right to focus Trending directly.
 - Themes are auto, dark, light, and Pure OLED Black. In light mode the clock and caption use a translucent paper surface.
 - Wallpapers are a valley, misty mountains, or a solid color. The theme switches on local TV time at 07:00 and 19:00, or can be locked in settings.
 
@@ -50,6 +51,8 @@ The screenshots show layout only. System Home, the screen saver, the cold-stone 
 | Exit an app launched from the desktop | Return directly to the custom desktop, without a stock-Home frame |
 | Back does not exit inside an app | Hold Back for about 0.7 seconds to return to the custom desktop |
 | Short Back inside an app | Keep the app's own back navigation |
+| Select "Clean RAM" in the menu | Drop Linux kernel PageCache and compact memory; toast shows freed memory |
+| TV idle for 5 minutes (on desktop/screensaver) | Daemon automatically drops cache quietly; paused during media playback or HDMI |
 | Disable the desktop (`desktop_mode.py off`) | Unmount the system Home and restore LG stock Home |
 
 Bilibili shows its own exit confirmation; confirming it returns directly to the custom desktop. YouTube AdFree and Alcyone consume short Back at the top level, so use long Back or Home to leave. Leaving the Alcyone screen does not disconnect the VPN tunnel.

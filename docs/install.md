@@ -89,3 +89,24 @@ bash scripts/build.sh
 ```
 
 系统 Home 和屏保都使用 bind mount 覆盖，不写入系统分区。停用桌面不等于撤销 root；本仓库没有完整 unroot 流程。
+
+## 系统性能分析与可逆瘦身
+
+1. 查看当前电视可用内存、常驻预加载应用与遥测推广项：
+
+```sh
+python3 tools/profile.py
+```
+
+2. 预演或应用系统瘦身（停用 LG 频道与浏览器常驻预加载、关闭 ACR 与广告，释放约 150 MiB 内存并建立开机自启钩子）：
+
+```sh
+python3 tools/debloat.py plan
+python3 tools/debloat.py apply
+```
+
+3. 恢复出厂预加载与遥测设置：
+
+```sh
+python3 tools/debloat.py restore
+```
