@@ -44,9 +44,10 @@ test('frontend sources.css optimizes infinite animations and shadow rasterizatio
   assert.doesNotMatch(appJs, /cinemaCardNodes\[[^\]]*\][^{]*scale:/, 'app.js must not animate scale on cinemaCardNodes');
 });
 
-test('frontend benchmark.js exports runScrollBenchmark and loads in index.html', () => {
+test('frontend benchmark.js and pool.js load in index.html', () => {
   const html = fs.readFileSync(path.join(rootDir, 'app', 'index.html'), 'utf8');
   assert.match(html, /<script src="benchmark\.js"><\/script>/, 'index.html must load benchmark.js');
+  assert.match(html, /<script src="pool\.js"><\/script>/, 'index.html must load pool.js');
 
   const benchmarkCode = fs.readFileSync(path.join(rootDir, 'app', 'benchmark.js'), 'utf8');
   const context = { window: {}, console, location: { search: '' } };

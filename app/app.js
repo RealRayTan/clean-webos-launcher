@@ -17,7 +17,10 @@
   var cinemaStatusText = $('cinemaStatusText'), cinemaTrack = $('cinemaTrack');
   var cinemaTab = 'movie', cinemaIndex = 0, cinemaFocus = 'shelf', cinemaTopIndex = 1;
   var cinemaFrontIndex = 0, cinemaCardsData = [], cinemaCardNodes = [];
-  var cinemaDebounceTimer = 0, cinemaPreloads = {};
+  var cinemaDebounceTimer = 0;
+  var homeCoverPool = (typeof window !== 'undefined' && window.ImagePool) ? window.ImagePool.create(8) : { acquire: function () {}, has: function () { return false; }, pruneNonVisible: function () {} };
+  var cinemaMediaPool = (typeof window !== 'undefined' && window.ImagePool) ? window.ImagePool.create(10) : { acquire: function () {}, has: function () { return false; }, pruneNonVisible: function () {} };
+  var preloadQueue = (typeof window !== 'undefined' && window.PreloadQueue) ? window.PreloadQueue.create() : { enqueue: function () {}, pause: function () {}, resume: function () {} };
   if (cinemaBgs[0]) cinemaBgs[0].decoding = 'async';
   if (cinemaBgs[1]) cinemaBgs[1].decoding = 'async';
   var FALLBACK_TRENDING = {
@@ -109,7 +112,7 @@
   var items = [], index = 0, zone = 'list', menuIndex = 0, offset = 0, topRightIndex = 0;
   var frontIndex = 0, frontImage = '', coverKey = '', pending = null, fadeTimer = 0, requestId = 0;
   var rowNodes = [], coverDebounceTimer = 0, carouselTimer = 0, subIndex = 0;
-  var preloads = {}, COVER_FADE_MS = 600;
+  var COVER_FADE_MS = 600;
   var motionQuery = window.matchMedia ? window.matchMedia('(prefers-reduced-motion: reduce)') : null;
   var dialogType = '', returnZone = 'list', loadingApps = false, lastLaunch = 0, toastTimer;
   var okDown = false, okTarget = null, orderDraft = null, movingId = null;
@@ -243,7 +246,11 @@
     updateList(); updateZones();
     clearTimeout(coverDebounceTimer);
     resetCarousel();
-    coverDebounceTimer = setTimeout(updateCoverImmediate, 120);
+    preloadQueue.pause();
+    coverDebounceTimer = setTimeout(function () {
+      updateCoverImmediate();
+      preloadQueue.resume();
+    }, 120);
   }
   function updateList() {
     offset = Math.max(0, Math.min(index - 3, items.length - 6));
@@ -337,15 +344,11 @@
     if (!cinemaCardsData || !cinemaCardsData.length) return;
     for (var i = 0; i < Math.min(cinemaCardsData.length, 6); i++) {
       var it = cinemaCardsData[i];
-      if (it.backdrop && !cinemaPreloads[it.backdrop]) {
-        cinemaPreloads[it.backdrop] = true;
-        var bImg = new Image(); bImg.decoding = 'async'; bImg.src = it.backdrop;
-        if (bImg.decode) bImg.decode().catch(function () {});
+      if (it.poster && !cinemaMediaPool.has(it.poster)) {
+        preloadQueue.enqueue(it.poster, cinemaMediaPool);
       }
-      if (it.poster && !cinemaPreloads[it.poster]) {
-        cinemaPreloads[it.poster] = true;
-        var pImg = new Image(); pImg.decoding = 'async'; pImg.src = it.poster;
-        if (pImg.decode) pImg.decode().catch(function () {});
+      if (it.backdrop && !cinemaMediaPool.has(it.backdrop)) {
+        preloadQueue.enqueue(it.backdrop, cinemaMediaPool);
       }
     }
   }
@@ -405,11 +408,14 @@
     if (cinemaFocus === 'shelf') updateCinemaTopFocus();
 
     clearTimeout(cinemaDebounceTimer);
+    preloadQueue.pause();
     if (skipAnimation) {
       updateCinemaStageContent(true);
+      preloadQueue.resume();
     } else {
       cinemaDebounceTimer = setTimeout(function () {
         updateCinemaStageContent(false);
+        preloadQueue.resume();
       }, 200);
     }
   }
@@ -486,6 +492,8 @@
 
   function closeCinema() {
     clearTimeout(cinemaDebounceTimer);
+    preloadQueue.clear();
+    cinemaMediaPool.pruneNonVisible([]);
     var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches);
     if (useGSAP) {
       gsap.killTweensOf([cinemaView, cinemaTrack]);
@@ -552,10 +560,9 @@
     });
     targets.forEach(function (app) {
       var item = contentFor(app, 0);
-      if (!item || preloads[item.image]) return;
-      preloads[item.image] = true;
-      var image = new Image(); image.decoding = 'async'; image.src = item.image;
-      if (image.decode) image.decode().catch(function () {});
+      if (!item || !item.image) return;
+      if (homeCoverPool.has(item.image)) return;
+      preloadQueue.enqueue(item.image, homeCoverPool);
     });
   }
   function resetCarousel() {
@@ -599,6 +606,7 @@
       incoming.style.transition = ''; outgoing.style.transition = '';
       incoming.style.opacity = ''; outgoing.style.opacity = '';
       frontIndex = pending.index; frontImage = pending.image; pending = null;
+      homeCoverPool.pruneNonVisible([frontImage]);
     });
   }
   function markMedia(layer, card) {
@@ -1124,6 +1132,8 @@
     resetKeys(); clock();
     if (zone === 'cinema') closeCinema();
     if (!overlay.hidden) closeDialog();
+    homeCoverPool.pruneNonVisible([frontImage]);
+    cinemaMediaPool.pruneNonVisible([]);
     var wanted = state.lastFocus;
     items.forEach(function (item, i) { if (item.id === wanted) index = i; });
     updateList(); updateCover(); updateZones();
