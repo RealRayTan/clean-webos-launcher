@@ -31,6 +31,8 @@
     vpnStatus: function (done) { call('luna://com.gathin.tvhome.service/vpnStatus', {}, done); },
     loadState: function (done) { call('luna://com.gathin.tvhome.service/loadState', {}, done); },
     saveState: function (state, done) { call('luna://com.gathin.tvhome.service/saveState', { state: state }, done || function () {}); },
+    cleanRam: function (done) { call('luna://com.gathin.tvhome.service/cleanRam', {}, done); },
+    ramInfo: function (done) { call('luna://com.gathin.tvhome.service/ramInfo', {}, done); },
     launch: function (id, params, done) { call('luna://com.webos.applicationManager/launch', { id: id, params: params || {} }, done); }
   };
 }());

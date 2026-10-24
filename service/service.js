@@ -70,6 +70,7 @@ function handleBack(value, source) {
   }
 }
 function handleKey(code, value, source) {
+  if (ramManager && ramManager.recordInput) ramManager.recordInput();
   if (code === 158) { handleBack(value, source); return; }
   handleHome(code, value, source);
 }
@@ -142,3 +143,6 @@ try { require('./native-home').start(handleHome, log); } catch (error) { log('na
 var resumeStatus = require('./resume-state').start(service, fs, launch, log, enabled, isSystemHome);
 
 var returnOrigin = require('./return-origin').start(service, launch, enabled, function () { return resumeStatus().phase === 'active'; }, log, isSystemHome);
+
+var ramManager;
+try { ramManager = require('./ram-manager').start(service, log, isSystemHome); } catch (error) { log('ram-manager unavailable: ' + error.message); }

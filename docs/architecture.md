@@ -117,3 +117,10 @@ B站使用公开热门接口，YouTube 使用 NASA RSS，Netflix 使用官方周
   - `tools/profile.py`：只读远程监控工具，采集 `MemAvailable`、桌面 PSS、运行中应用、预加载状态与 ACR 遥测开关。
   - `tools/debloat.py`：可逆系统级瘦身管理工具，支持 `plan`、`status`、`apply`、`restore`。停用 `lgchannels` 与内置浏览器的驻留预加载（释放约 150 MiB 内存），关闭 `livePlus`（ACR 屏幕指纹识别）与主页推广；通过 `/var/lib/webosbrew/init.d/50-debloat` 实现开机持久化与出厂无损复原。
   - `app/benchmark.js`：前端内置连续按键与帧耗时测量探针，统计平均 FPS、1% Low FPS、严重卡顿帧数与最长单帧耗时。
+
+## 1.5.7 内核内存闲置守护与一键清理
+
+借鉴并原生落地 Linux 内核缓存回收机制：
+- **`service/ram-manager.js`**：以 root 权限管理 `/proc/sys/vm/drop_caches`（释放 PageCache、dentries、inodes）与 `/proc/sys/vm/compact_memory`（内存碎片紧缩）。实测单次回收可释放 140+ MiB 物理缓存。
+- **智能闲置守护（Idle Daemon）**：监听遥控器输入时间戳与系统前台应用。仅在连续 5 分钟无遥控器按键输入、且前台处于桌面或系统屏保时静默执行回收（至少间隔 15 分钟），正在播放流媒体或处于 HDMI 游戏时自动挂起，绝不影响观影与低延迟交互。
+- **桌面菜单入口**：菜单栏增加“清理内存”选项，点击后调用 Luna 总线立即回收，并在桌面底部弹出 Toast 汇报可用内存与净释放量。

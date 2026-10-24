@@ -271,6 +271,21 @@
     if (action === 'all') { openDialog('all'); refreshApps(false); }
     else if (action === 'inputs') openDialog('inputs');
     else if (action === 'settings') openDialog('settings');
+    else if (action === 'clean-ram') {
+      zone = 'list'; updateZones();
+      toast('正在清理系统缓存…');
+      TVDevice.cleanRam(function (res) {
+        if (!res || !res.returnValue) {
+          toast(res && res.errorText ? res.errorText : '清理失败');
+          return;
+        }
+        if (res.freedMb > 0) {
+          toast('已释放 ' + res.freedMb + ' MiB 内存 · 可用 ' + res.afterMb + ' MiB');
+        } else {
+          toast('内存状态良好 · 当前可用 ' + res.afterMb + ' MiB');
+        }
+      });
+    }
     else if (action === 'network') {
       if (installed(vpnId)) launch(vpnId); else launch('com.palm.app.settings', { target: 'network' });
       zone = 'list'; updateZones();
