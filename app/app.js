@@ -305,29 +305,30 @@
     var nextLayer = cinemaLayers[nextIndex];
     var nextBg = cinemaBgs[nextIndex];
     var prevLayer = cinemaLayers[cinemaFrontIndex];
-    var prevBg = cinemaBgs[cinemaFrontIndex];
 
     if (nextBg.getAttribute('src') === src && nextLayer.classList.contains('is-visible')) return;
-    nextBg.src = src;
 
-    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
-    if (useGSAP) {
-      gsap.killTweensOf([nextLayer, prevLayer]);
-      nextLayer.classList.add('is-visible');
-      gsap.fromTo(nextLayer, { opacity: 0 }, {
-        opacity: 1,
-        duration: 0.35,
-        ease: 'power2.out',
-        onComplete: function () {
-          prevLayer.classList.remove('is-visible');
-          gsap.set(prevLayer, { opacity: 0 });
-        }
-      });
-    } else {
+    var img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+
+    function applyFade() {
+      nextBg.src = src;
       nextLayer.classList.add('is-visible');
       prevLayer.classList.remove('is-visible');
+      cinemaFrontIndex = nextIndex;
     }
-    cinemaFrontIndex = nextIndex;
+
+    if (skipAnimation) {
+      applyFade();
+    } else if (img.decode) {
+      img.decode().then(applyFade).catch(applyFade);
+    } else if (img.complete) {
+      applyFade();
+    } else {
+      img.onload = applyFade;
+      img.onerror = applyFade;
+    }
   }
 
   function updateCinemaTopFocus() {
@@ -386,18 +387,7 @@
     var targetOffset = Math.max(0, Math.min(cinemaIndex - 2, maxOffset));
     var targetX = -(targetOffset * slotWidth);
 
-    var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches) && !skipAnimation;
-
-    if (useGSAP) {
-      gsap.to(cinemaTrack, {
-        x: targetX,
-        duration: 0.16,
-        ease: 'power2.out',
-        overwrite: 'auto'
-      });
-    } else {
-      cinemaTrack.style.transform = 'translateX(' + targetX + 'px)';
-    }
+    cinemaTrack.style.transform = 'translate3d(' + targetX + 'px, 0, 0)';
 
     cinemaCardNodes.forEach(function (card, i) {
       var isFocused = (cinemaFocus === 'shelf' && i === cinemaIndex);
