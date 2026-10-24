@@ -364,8 +364,8 @@
     if (useGSAP) {
       var metaItems = [cinemaScore, cinemaGenre, cinemaDate, cinemaTitle, cinemaOrigin, cinemaDesc];
       gsap.fromTo(metaItems,
-        { opacity: 0.35, y: 5 },
-        { opacity: 1, y: 0, duration: 0.24, stagger: 0.015, ease: 'power2.out', overwrite: 'auto' }
+        { opacity: 0.4 },
+        { opacity: 1, duration: 0.2, ease: 'power2.out', overwrite: 'auto' }
       );
     }
     setCinemaBackdrop(item.backdrop, skipAnimation);
@@ -388,7 +388,7 @@
     if (useGSAP) {
       gsap.to(cinemaTrack, {
         x: targetX,
-        duration: 0.18,
+        duration: 0.16,
         ease: 'power2.out',
         overwrite: 'auto'
       });
@@ -410,7 +410,7 @@
     } else {
       cinemaDebounceTimer = setTimeout(function () {
         updateCinemaStageContent(false);
-      }, 110);
+      }, 200);
     }
   }
 
@@ -451,20 +451,9 @@
 
     var useGSAP = typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches);
     if (useGSAP) {
-      gsap.fromTo(cinemaCardNodes,
-        { opacity: 0, y: 20 },
-        {
-          opacity: 0.72,
-          y: 0,
-          duration: 0.32,
-          stagger: 0.025,
-          ease: 'power2.out',
-          onComplete: function () {
-            if (cinemaCardNodes[0] && cinemaFocus === 'shelf') {
-              gsap.to(cinemaCardNodes[0], { opacity: 1, scale: 1.05, y: -6, duration: 0.16 });
-            }
-          }
-        }
+      gsap.fromTo(cinemaTrack,
+        { opacity: 0.2 },
+        { opacity: 1, duration: 0.2, ease: 'power2.out' }
       );
     }
   }
@@ -482,26 +471,12 @@
       cinemaView.classList.add('is-visible');
       var topEl = cinemaView.querySelector('.cinema-top');
       var stageEl = cinemaView.querySelector('.cinema-stage');
-      gsap.killTweensOf([cinemaView, topEl, stageEl]);
-      gsap.fromTo(cinemaView, { opacity: 0, scale: 1.02 }, { opacity: 1, scale: 1, duration: 0.32, ease: 'power3.out' });
-      if (topEl) gsap.fromTo(topEl, { opacity: 0, y: -20 }, { opacity: 1, y: 0, duration: 0.38, delay: 0.04, ease: 'power2.out' });
-      if (stageEl) gsap.fromTo(stageEl, { opacity: 0, x: -30 }, { opacity: 1, x: 0, duration: 0.42, delay: 0.07, ease: 'power2.out' });
-      gsap.fromTo(cinemaCardNodes,
-        { opacity: 0, y: 35 },
-        {
-          opacity: 0.72,
-          y: 0,
-          duration: 0.38,
-          stagger: 0.03,
-          delay: 0.1,
-          ease: 'power2.out',
-          onComplete: function () {
-            if (cinemaCardNodes[cinemaIndex]) {
-              gsap.to(cinemaCardNodes[cinemaIndex], { opacity: 1, scale: 1.05, y: -6, duration: 0.18, ease: 'power2.out' });
-            }
-          }
-        }
-      );
+      var shelfEl = cinemaView.querySelector('.cinema-shelf');
+      gsap.killTweensOf([cinemaView, topEl, stageEl, shelfEl]);
+      gsap.fromTo(cinemaView, { opacity: 0 }, { opacity: 1, duration: 0.26, ease: 'power2.out' });
+      if (topEl) gsap.fromTo(topEl, { opacity: 0, y: -12 }, { opacity: 1, y: 0, duration: 0.3, delay: 0.03, ease: 'power2.out' });
+      if (stageEl) gsap.fromTo(stageEl, { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.32, delay: 0.05, ease: 'power2.out' });
+      if (shelfEl) gsap.fromTo(shelfEl, { opacity: 0, y: 15 }, { opacity: 1, y: 0, duration: 0.32, delay: 0.07, ease: 'power2.out' });
     } else {
       requestAnimationFrame(function () {
         cinemaView.classList.add('is-visible');
@@ -1042,17 +1017,9 @@
           updateCinemaTopFocus();
           cinemaCardNodes.forEach(function (c) {
             c.classList.remove('focus');
-            if (typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches)) {
-              gsap.to(c, { scale: 1.0, y: 0, opacity: 0.72, duration: 0.2, ease: 'power2.out', overwrite: 'auto' });
-            }
           });
         } else if (key === 'Enter') {
           event.preventDefault();
-          if (cinemaCardNodes[cinemaIndex] && typeof window !== 'undefined' && window.gsap && (!motionQuery || !motionQuery.matches)) {
-            gsap.timeline()
-              .to(cinemaCardNodes[cinemaIndex], { scale: 0.98, duration: 0.08, ease: 'power1.in' })
-              .to(cinemaCardNodes[cinemaIndex], { scale: 1.05, duration: 0.16, ease: 'power2.out' });
-          }
         }
       } else if (cinemaFocus === 'top') {
         if (key === 'ArrowLeft') {

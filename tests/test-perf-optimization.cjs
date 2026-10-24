@@ -33,9 +33,15 @@ test('frontend sources.css optimizes infinite animations and shadow rasterizatio
   // Dots should avoid expensive box-shadow blurs
   assert.doesNotMatch(css, /\.source-dot\s*\{[^}]*box-shadow:/, 'source-dot must not use dynamic box-shadow blur');
 
-  // trending.css cinema-card must not use backdrop-filter blur
+  // trending.css cinema-card must not use backdrop-filter blur or scaling/floating transforms
   const trendingCss = fs.readFileSync(path.join(rootDir, 'app', 'trending.css'), 'utf8');
   assert.doesNotMatch(trendingCss, /\.cinema-card\s*\{[^}]*backdrop-filter:\s*blur/, 'cinema-card must not use backdrop-filter blur');
+  assert.doesNotMatch(trendingCss, /\.cinema-card\.focus[^{]*\{[^}]*scale\(/, 'cinema-card.focus must not scale');
+  assert.doesNotMatch(trendingCss, /\.cinema-card\.focus[^{]*\{[^}]*translateY\(/, 'cinema-card.focus must not float translateY');
+
+  // app.js must not inject inline scale transforms onto cinema cards
+  const appJs = fs.readFileSync(path.join(rootDir, 'app', 'app.js'), 'utf8');
+  assert.doesNotMatch(appJs, /cinemaCardNodes\[[^\]]*\][^{]*scale:/, 'app.js must not animate scale on cinemaCardNodes');
 });
 
 test('frontend benchmark.js exports runScrollBenchmark and loads in index.html', () => {
