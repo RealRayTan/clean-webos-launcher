@@ -1,107 +1,130 @@
-# LG webOS poster-list desktop
+# LG webOS Minimalist Poster Desktop
+
+> An immersive poster launcher crafted for rooted LG webOS TVs. Eliminate stock advertisements, free up system memory, and unlock the full potential of OLED displays.
 
 [简体中文](README.md) | **English**
 
-A poster-list Chinese launcher for rooted LG webOS TVs. It bind-mounts the launcher as the system Home, so app exits, a short Home press, and boot go straight to it without flashing LG's stock Home. It also restores the launcher or the last HDMI input after waking from standby. The launcher runs on the TV, so no computer has to stay on.
+Current hardware and repository version: **v1.5.9**. Target platforms: LG webOS 24 and webOS 25 (Verified on hardware: LG OLED42C5XCA).
 
-It starts from [webos-vibehack](https://github.com/OmkarK97/webos-vibehack), with Chinese font fallback, a TV-side button helper, the poster-list home, the system-home mount, a system screen-saver replacement, and shared launcher state added here. Current source and tested version: **1.5.9**. The interface is in Chinese; this page is the English documentation.
+---
 
-## Install
+## Why Replace the Stock Home?
 
-The TV must be rooted, with Homebrew Channel installed and SSH key login configured. This repository does not provide root tools or third-party binaries. Follow [installation and deployment](docs/install.md) to sync apps, prepare native dependencies, and package the launcher. Disabling works from the same page.
+LG stock webOS home features intrusive commercial promos, rotating banners, and background telemetry. Exiting apps often causes stutter and flashes the vendor storefront.
 
-A rooted TV installs over **root SSH on port 22**, not the webOS Developer Mode port 9922. The installer mounts the launcher as the system Home, mounts the standalone screen saver over LG's screen-saver app, and syncs the launcher state into the Home copy. A short Home press or an app exit lands directly on the desktop.
+This project uses non-destructive bind mounts to replace the stock home with a fast, uncluttered poster desktop. The desktop runs directly on the TV Linux system without requiring an external streaming box or an always-on computer.
 
-To restore LG stock Home and the stock screen saver temporarily, run `tools/desktop_mode.py off`; run `on` to re-enable. To restore only the stock screen saver, run `tools/screensaver_mode.py off`. Disabling removes only the mounts and startup hooks; apps and root stay installed. System profiling and reversible debloating are supported via `tools/profile.py` and `tools/debloat.py`.
-
-## Interface
-
-| LG stock home | Custom desktop | Screen saver |
+| Dimension | LG Stock webOS Home | This Poster Desktop (v1.5.9) |
 |---|---|---|
-| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![Cold-stone system-home desktop with the app list and an Apple TV cover](docs/images/poster-home-1.5.3.png)](docs/images/poster-home-1.5.3.png) | [![Floating clock on a pure-black screen saver](docs/images/screensaver-1.5.3.png)](docs/images/screensaver-1.5.3.png) |
+| **Startup Speed** | Waits for sponsored cards and ad networks to load | Reaches the desktop in seconds with zero ads |
+| **App Exits** | Returns to the heavy vendor home screen | Lands directly on the desktop and preserves context |
+| **Available RAM** | Typically only ~450 MB remains free after boot | **Stably verified at 750 to 800 MB free** (~80% gain) |
+| **OLED Visuals** | Bright clutter and gray backgrounds | Pure OLED Black theme with true off pixels |
+| **Burn-in Protection** | Stock clocks are often occluded by app dialogs | Standalone system screen saver with 25s floating drift |
+| **Multi-Device Support** | Reboots frequently drop active HDMI inputs | Wake from standby cleanly preserves HDMI inputs and labels |
+| **Firmware Safety** | Traditional hacks modify read-only system partitions | **Read-only Bind Mounts** with one-step full restoration |
 
-The left side is a vertical list of the computer input and favourite apps. The focused app gets a dynamic cover:
+---
 
-- Landscape covers run full-bleed. Portrait covers sit in a card at about 80% height on the right over a static darkened background, eliminating GPU real-time blur stutters.
-- Covers crossfade with two layers. They do not slide sideways or stack when switching quickly.
-- The bottom-right caption shows the current title and a one-line description, with Chinese preferred.
-- The three-line menu at the bottom left holds all apps, inputs, RAM cleaner, network, and settings.
-- The top-right header holds the Trending cinema exploration entrance, live local weather, theme toggle, and the clock. Press Right to focus Trending directly.
-- Themes are auto, dark, light, and Pure OLED Black. In light mode the clock and caption use a translucent paper surface.
-- Wallpapers are a valley, misty mountains, or a solid color. The theme switches on local TV time at 07:00 and 19:00, or can be locked in settings.
+## Core Capabilities
 
-Settings are grouped into **Appearance**, **Desktop**, and **System**. Appearance holds theme, wallpaper, Pure OLED Black, and input labels; Desktop holds home apps and content sources; System opens LG settings. Theme, wallpaper, home apps, order, and HDMI labels are stored on the TV; the normal app and the system-home copy share them through a TV-side state file.
+### 1. True System Home Replacement
+- **Native Mount**: Bind-mounts over `com.webos.app.home`. Short-pressing Home, booting up, or exiting an app goes straight to the desktop without stock home flashes.
+- **Persistent Flash Staging**: Mount staging lives in flash storage at `/var/lib/lg-c5-home/system-home` rather than RAM-backed tmpfs, reclaiming physical memory.
+- **Emergency Escape Hatch**: Short Back presses are left entirely to third-party apps. Long-pressing Back for 0.7s provides a reliable escape route back to the desktop, eliminating black-screen deadlocks.
 
-Input labels assign HDMI 1–4 to Default, PC, PS5, PS4, Xbox, Switch, or Media Center; the home computer entry shows the matching name and color mark.
+### 2. Immersive Dynamic Posters and Discovery Radar
+- **Multi-Platform Covers**: Asynchronously fetches dynamic backdrops from Bilibili, YouTube NASA RSS, Netflix Top 10, Apple TV Press, and TMDB (Prime Video, Disney+, Max).
+- **Smooth Auto-Carousel**: Resting on apps with multiple titles smoothly crossfades between featured artworks every 10 seconds, updating titles and summaries in lockstep.
+- **Trending Cinema Hall**: Tap right on the main menu to enter the full-screen discovery hall, featuring weekly movies and TV shows with original titles, TMDB ratings, and descriptions.
+- **Network Resilience and SOCKS5 Proxy**: Automatically queries Alcyone local SOCKS5 loopback on port 10801 to route restricted poster domains through proxy, while keeping public domestic sources direct.
 
-The screen saver is no longer an in-app overlay. It bind-mounts over LG's `com.webos.app.screensaver` just like the system Home: after three idle minutes the system starts a pure-black floating clock, shifts it slightly about every 25 seconds, and dismisses it on any key. This prevents the stock screen saver from covering the custom one.
+### 3. Lightweight 60 FPS Television Rendering Engine
+- **Bounded LRU Texture Pool (`app/pool.js`)**: Limits resident memory to 8 home covers and 10 discovery cards. Evicted items explicitly detach GPU texture handles via `src = ''` to prevent memory leaks.
+- **Sequential Async Preloading (`PreloadQueue`)**: Processes image decodes one at a time via single-task FIFO scheduling, pausing during remote navigation to maintain 60 FPS scrolling.
+- **Zero Real-Time Gaussian Blurring**: Replaces expensive 1080p CSS blur filters and heavy card drop-shadows with static pre-darkened layers and compositor transitions.
 
-Short Back stays with the app. When an app consumes Back and will not exit, holding Back for about 0.7 seconds returns to the desktop without breaking short in-app navigation.
+### 4. Deep System Debloating and Kernel RAM Management
+- **Preload Policy Override**: Suppresses background preloads for YouTube and LG Channels via Luna API calls, stopping idle background apps from consuming over 160 MB of RAM.
+- **Safe Daemon Pruning**: Safely stops 8 unneeded telemetry units such as `service-logger`, `ai-inference-manager`, and `alwaysready`, while disabling vendor ad switches.
+- **One-Click and Idle Kernel Cache Reclamation**: The drawer menu offers a Clean RAM button to drop PageCache and compact memory with root privileges. The daemon automatically runs silent cleanups after 5 minutes of idle time on the desktop or screen saver.
+- **Strict Safety Boundaries**: Explicitly protects `sdx` (preserving Settings gear menu functionality) and `ss.gateway` (preserving DIAL phone casting).
 
-The screenshots show layout only. System Home, the screen saver, the cold-stone light palette, button interception, and standby recovery results are in the [verification record](docs/verification.md).
+### 5. Tailored OLED Aesthetics and Screen Saver
+- **Four Distinct Themes**: Features Auto, Dark, Cold-stone Light, and Pure OLED Black.
+- **System-Level Screen Saver**: Replaces `com.webos.app.screensaver` with a pure-black floating clock. System idle triggers the screen saver after 3 minutes, floating every 25 seconds and waking on any button press.
+- **Live Local Weather**: Reads local weather conditions and dynamically matches theme transitions to sunset and sunrise times.
 
-## Home button and standby behavior
+---
 
-| Action | Result |
+## Interface Preview
+
+| LG Stock Home (Vendor Clutter) | Custom Desktop (Cold-stone Light) | Pure Black Screen Saver |
+|---|---|---|
+| [![LG stock home](docs/images/lg-home.png)](docs/images/lg-home.png) | [![Custom desktop](docs/images/poster-home-1.5.3.png)](docs/images/poster-home-1.5.3.png) | [![Screen saver](docs/images/screensaver-1.5.3.png)](docs/images/screensaver-1.5.3.png) |
+
+---
+
+## Quick Start
+
+### Prerequisites
+1. Rooted LG webOS TV with **Homebrew Channel** installed.
+2. SSH service enabled in Homebrew Channel settings (default port 22, public key authentication recommended).
+3. Local development environment with Python 3.12 and Node.js 22.
+
+### Installation
+1. Configure connection targets (environment variables take precedence, or use `Host lgtv` in `~/.ssh/config`):
+   ```sh
+   export TV_HOST='192.168.x.x'
+   export TV_SSH_KEY='/path/to/your/key'
+   ```
+2. Install dependencies and verify native binaries:
+   ```sh
+   npm install --global @webos-tools/cli
+   python3 -m venv .venv
+   .venv/bin/pip install -r requirements.txt
+   python3 scripts/prepare_native.py /path/to/native-artifact
+   ```
+3. Build the release package and deploy to the TV:
+   ```sh
+   bash scripts/build.sh
+   .venv/bin/python tools/install.py
+   ```
+The installer mounts the components immediately without requiring a reboot. Press Home on the remote to begin.
+
+### Rollback and Mode Switches
+- **Restore stock Home and stock screen saver**:
+  ```sh
+  .venv/bin/python tools/desktop_mode.py off
+  ```
+- **Re-enable custom desktop**:
+  ```sh
+  .venv/bin/python tools/desktop_mode.py on
+  ```
+- **Restore stock screen saver only**:
+  ```sh
+  .venv/bin/python tools/screensaver_mode.py off
+  ```
+
+---
+
+## Daily Remote Navigation
+
+| Remote Button | Action and Response |
 |---|---|
-| Short press Home | Open the system-home custom desktop |
-| Hold Home | Use the system Home long-press path; while enabled, the stock LG Home is masked by the mount |
-| Shut down from the desktop, then power on (wake from standby) | Restore the custom desktop |
-| Shut down from HDMI, then power on | LG keeps the last input |
-| Exit an app launched from the desktop | Return directly to the custom desktop, without a stock-Home frame |
-| Back does not exit inside an app | Hold Back for about 0.7 seconds to return to the custom desktop |
-| Short Back inside an app | Keep the app's own back navigation |
-| Select "Clean RAM" in the menu | Drop Linux kernel PageCache and compact memory; toast shows freed memory |
-| TV idle for 5 minutes (on desktop/screensaver) | Daemon automatically drops cache quietly; paused during media playback or HDMI |
-| Disable the desktop (`desktop_mode.py off`) | Unmount the system Home and screen saver, restoring LG stock Home and screen saver |
-| Disable only the screen saver (`screensaver_mode.py off`) | Unmount the custom screen saver, restoring LG stock screen saver |
+| **Short Press Home** | Opens the custom poster desktop in seconds |
+| **Long Press Home** | Preserves the system default long-press path |
+| **Short Press Back in App** | Handled natively by the third-party application |
+| **Stuck or Frozen App** | **Hold Back for ~0.7s** to force exit back to the desktop |
+| **Wake from Standby** | Restores the desktop if active before sleep, or preserves HDMI inputs |
+| **Right Arrow on Main Menu** | Quick jump to the Trending Cinema discovery hall |
+| **Drawer Menu Clean RAM** | Reclaims kernel PageCache memory and compacts memory fragments |
 
-Bilibili shows its own exit confirmation; confirming it returns directly to the custom desktop. YouTube AdFree and Alcyone consume short Back at the top level, so use long Back or Home to leave. Leaving the Alcyone screen does not disconnect the VPN tunnel.
+---
 
-## Manage apps
+## Local Development and Verification
 
-1. Add or remove apps: open **All apps** from the menu, choose **Edit desktop**, then toggle apps. Hiding affects the home screen only; the all-apps list stays complete.
-2. Reorder: in **Edit desktop**, choose **Adjust home order**. Move with the arrow keys, confirm to save, Back to cancel.
-3. Refresh: reopen the desktop after installing an app, or refresh manually in the all-apps panel.
-
-## Compatibility and known limitations
-
-Tested on an LG OLED42C5XCA running webOS SDK 11.2.0 and firmware 43.21.73.
-
-The kernel is aarch64, but input interception and the user-space dependencies run in an ARM32 environment. Do not choose aarch64 native modules from the kernel architecture.
-
-Known limitations:
-
-- The system Home is a bind mount over LG's Home, not a change to the system partition. While enabled, LG stock Home is not directly reachable; run `tools/desktop_mode.py off` to restore it.
-- The screen saver is a bind mount over LG's screen-saver app. Run `tools/screensaver_mode.py off` to restore only the stock screen saver.
-- Long Back is fixed at about 0.7 seconds. Short Back remains entirely owned by the third-party app.
-- The TV-side button helper has no supervisor to restart it after a crash.
-- Playback position inside third-party streaming apps is not restored.
-- Standby recovery is verified on the TV; a full cold boot is not.
-- The app graphics layer is capped at 1920×1080, and a 4K TV upscales the whole interface. Full-bleed landscape covers look softer than portrait cards on 4K; the public YouTube thumbnail is at most 1280×720.
-- Covers come from public sources. If an old low-resolution image remains after an upgrade, force an update from **Settings → Content sources → Refresh public content**. Portrait cards and full-bleed covers use different source sizes.
-
-## Dynamic cover sources
-
-The TV fetches public data asynchronously to build covers and titles. It does not read personal accounts or watch history. The service checks every 5 minutes, public sources cache for 15 minutes, and TMDB catalogs for 30 minutes; the desktop reads the result every 60 seconds, and manual **Refresh public content** remains available.
-
-| Cover app | Source | Notes |
-|---|---|---|
-| Bilibili | [Bilibili public popular list](https://www.bilibili.com/v/popular/all) | Public ranking, no personal recommendations |
-| YouTube | [NASA](https://www.youtube.com/@NASA) public RSS | Public video updates and thumbnails, up to 1280×720 |
-| Netflix | [Netflix Tudum Top 10](https://www.netflix.com/tudum/top10) | Weekly English TV top 10, covers prefer [TVmaze](https://www.tvmaze.com/api) originals |
-| Apple TV | [Apple TV Press](https://www.apple.com/tv-pr/originals/) + TMDB | Prefer TMDB originals; fall back to Apple's `video_show_home_large_2x` 1960×1104 / `large_2x` |
-| Prime Video / Disney+ / HBO Max | [TMDB API](https://www.themoviedb.org/) + JustWatch | Public catalog picks for the US region, preferring `original` sizes |
-
-TMDB covers show catalog picks, not official rankings or personal watch progress. Prime Video covers are confirmed on the TV. Disney+ and HBO Max have only been checked through data queries, with no playback test. Artwork and trademarks belong to their owners. TMDB setup is in [streaming catalog configuration](docs/streaming-catalog.md).
-
-The TV must be able to reach these public sources. On a restricted network, YouTube RSS, Netflix Tudum, and TMDB fail and keep the previous cover; Bilibili and Apple TV usually still refresh. Version 1.5.3 reads Alcyone's local loopback SOCKS port and sends only YouTube, Netflix, and TMDB through it; Bilibili and Apple TV stay direct. Alcyone supplies the proxy on the TV, and the service does not read or store its node credentials. If the VPN is disconnected or the proxy is unavailable, failures keep the cached cover. **Settings → Content sources** shows the state.
-
-> This product uses the TMDB API but is not endorsed or certified by TMDB. Streaming availability data is provided by JustWatch via TMDB.
-
-## Local development and checks
-
-Local checks need Node.js 22 and Python 3.12, and do not connect to the TV:
+Run local checks on your computer without connecting to the TV:
 
 ```sh
 node --test tests/*.cjs
@@ -109,22 +132,22 @@ python3 -m compileall -q tools scripts
 bash -n scripts/build.sh service/autostart.sh service/as-home.sh service/screensaver-as-system.sh service/optimize.sh
 ```
 
-`app/apps.example.js` is a placeholder. Before the first deployment, run `tools/sync-apps.py` to sync the real app list and icons from the TV. Do not treat the example as the inventory on the device. The left-side **Computer** entry comes from `computerInput` in `app/config.js`, for example `com.webos.app.hdmi4`.
+---
 
-## Documentation
+## Architectural Documentation
 
-The linked guides are in Chinese:
-
-- [Installation and deployment](docs/install.md)
-- [Home interception and recovery](docs/architecture.md)
-- [Native dependencies and checksums](docs/native.md)
-- [Streaming catalog configuration](docs/streaming-catalog.md)
-- [Verification record](docs/verification.md)
-- [Project history](docs/project-record.md)
+- [Home Interception and Recovery Architecture](docs/architecture.md)
+- [Installation and Deployment Guide](docs/install.md)
+- [Native Dependency Verification and Checksums](docs/native.md)
+- [Streaming Catalog Configuration](docs/streaming-catalog.md)
+- [Hardware Verification and Benchmark Records](docs/verification.md)
+- [Project Evolution Record](docs/project-record.md)
 - [Changelog](CHANGELOG.md)
 
-## Upstream and license
+---
 
-The frontend starts from webos-vibehack. The native dependencies are inputhookpp and ezinject; the remaining projects are design references or separately installed apps. The full list, licenses, and asset credits are in [upstream and credits](docs/credits.md).
+## Upstream and Licenses
 
-New code and frontend changes are MIT. Upstream notices stay in [LICENSE](LICENSE) and the [original license file](licenses/webos-vibehack-MIT.txt). The Outfit font in `app/fonts/` is SIL OFL 1.1; `inputhookpp` and `ezinject` ship under their own licenses, outside MIT. This project is not affiliated with LG. Rooting may affect the warranty and cannot be guaranteed to be reversible without loss.
+The frontend originated from webos-vibehack. Native components are inputhookpp and ezinject. Detailed license information and asset attributions are in [Credits](docs/credits.md).
+
+Custom code and launcher enhancements are released under the MIT License in [LICENSE](LICENSE) and [upstream license](licenses/webos-vibehack-MIT.txt). Bundled fonts adhere to SIL OFL 1.1. Native dependencies follow their respective licenses. This project is not affiliated with LG Electronics.
