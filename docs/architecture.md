@@ -133,3 +133,13 @@ B站使用公开热门接口，YouTube 使用 NASA RSS，Netflix 使用官方周
 - **移除冗余缩放与位移**：移除海报卡片的 `scale(1.12)` 与 `translateY(-10px)` 样式。消除电视端 Chromium 引擎在横向位移时反复触犯的重新栅格化与抗锯齿重绘开销。
 - **解耦 JS 内联样式与 CSS 规则**：移除 GSAP 在页面入场与切换分类时写入卡片 DOM 的内联 `scale(1.05)`。卡片选中反馈完全交由 CSS 的 2px 白色外边框与 `opacity: 1` 驱动。
 - **背景防抖与平移提速**：将卡片切项后背景大图与详细元数据的刷新防抖从 110ms 提升至 200ms。横向滑动轨道过渡缩短至 160ms。连续按键切项时不再中途并发解码 1080p 全景背景，确保轨道滑动保持 60 FPS 满帧响应。
+
+## 1.5.9 系统优化与常驻内存减负
+
+1.5.9 吸收 webOS 逆向加固先验经验，将性能优化从前端渲染流水线延伸至操作系统底层环境：
+
+- **挂载源持久化**：`service/as-home.sh` 停止向 `/tmp`（tmpfs 内存文件系统）复制桌面文件，改为直接在闪存目录 `/var/lib/lg-c5-home/system-home` 暂存与维护系统 Home 副本，消除桌面资源对可用物理内存的挤占。
+- **后台预载策略优化**：在 `service/optimize.sh` 中调用 `com.webos.service.preloadmanager/setPreloadPolicy`，将 YouTube（`youtube.leanback.v4`）与 LG Channels（`com.webos.app.lgchannels`）等后台常驻预载关闭，应用保持按需秒开，退出后不再霸占物理内存。
+- **安全级 Debloat 与广告压制**：停止 `service-logger`、`ai-inference-manager`、`alwaysready` 等 8 个与本地显示无关的后台遥测守护进程；调用 `setSystemSettings` 将 `homePromotion`、`screenSaverAd`、`adCookie`、`aiNudge` 和 `livePromotion` 全部关闭，开启 `lmt`（限制广告跟踪），减轻系统后台轮询开销。
+- **安全防线守则**：严格排除 `com.webos.service.sdx` 与 `ss.gateway`，确保遥控器齿轮设置面板与手机投屏发现链路完全正常。在 `tools/desktop_mode.py off` 时支持一键还原预载策略与启动项。
+

@@ -13,10 +13,13 @@ if sys.argv[1:] == ['off']:
         f'mkdir -p {STATE}; touch {STATE}/disabled; '
         f'rm -f /var/lib/webosbrew/init.d/40-gathin-as-home /var/lib/webosbrew/init.d/60-lg-c5-home '
         f'/var/lib/webosbrew/init.d/41-gathin-screensaver '
-        f'{STATE}/system-home {STATE}/native-enabled; '
+        f'/var/lib/webosbrew/init.d/42-gathin-optimize '
+        f'{STATE}/native-enabled; '
+        f'rm -rf {STATE}/system-home /tmp/gathin-home-as-home; '
         f'umount {DST} 2>/dev/null || true; '
         f'umount /usr/palm/applications/com.webos.app.screensaver 2>/dev/null || true; '
         f'umount {SRC}/appinfo.json 2>/dev/null || true; '
+        f'if [ -f {SVC}/optimize.sh ]; then sh {SVC}/optimize.sh off 2>/dev/null || true; fi; '
         f'if [ -f {STATE}/keybinds.before.json ]; then '
         f'cp {STATE}/keybinds.before.json /home/root/.config/lginputhook/keybinds.json; fi; '
         f'if [ -f {STATE}/boot-input.orig ]; then '
@@ -56,8 +59,10 @@ elif sys.argv[1:] == ['on']:
         f'rm -f {STATE}/disabled; '
         'ln -sf ' + SVC + '/as-home.sh /var/lib/webosbrew/init.d/40-gathin-as-home; '
         'ln -sf ' + SVC + '/screensaver-as-system.sh /var/lib/webosbrew/init.d/41-gathin-screensaver; '
+        'ln -sf ' + SVC + '/optimize.sh /var/lib/webosbrew/init.d/42-gathin-optimize; '
         f'sh {SVC}/as-home.sh; '
-        f'sh {SVC}/screensaver-as-system.sh'
+        f'sh {SVC}/screensaver-as-system.sh; '
+        f'sh {SVC}/optimize.sh on'
     )
     result = remote(command)
     if result.returncode:

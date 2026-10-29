@@ -5,31 +5,31 @@
 set -eu
 SRC=/media/developer/apps/usr/palm/applications/com.gathin.tvhome
 DST=/usr/palm/applications/com.webos.app.home
-TMP=/tmp/gathin-home-as-home
 STATE=/var/lib/lg-c5-home
+STAGED="$STATE/system-home"
 LOG=/tmp/gathin-home-as-home.log
 NODE=/usr/bin/node
 
 [ -f "$SRC/index.html" ] || { echo "launcher not installed; leaving LG Home alone" >"$LOG"; exit 0; }
 if grep -q " $DST " /proc/mounts; then
-  OLD=$("$NODE" -e 'try{process.stdout.write(require(process.argv[1]).version)}catch(e){}' "$TMP/appinfo.json" 2>/dev/null || true)
+  OLD=$("$NODE" -e 'try{process.stdout.write(require(process.argv[1]).version)}catch(e){}' "$STAGED/appinfo.json" 2>/dev/null || true)
   NEW=$("$NODE" -e 'try{process.stdout.write(require(process.argv[1]).version)}catch(e){}' "$SRC/appinfo.json" 2>/dev/null || true)
   if [ "$OLD" = "$NEW" ]; then echo "already mounted" >"$LOG"; exit 0; fi
   umount -l "$DST" 2>/dev/null || true
   umount -l "$SRC/appinfo.json" 2>/dev/null || true
 fi
 
-rm -rf "$TMP"
-mkdir -p "$TMP"
-cp -a "$SRC/." "$TMP/" || exit 0
-rm -rf "$TMP/content-cache"
+rm -rf "$STAGED" /tmp/gathin-home-as-home
+mkdir -p "$STAGED"
+cp -a "$SRC/." "$STAGED/" || exit 0
+rm -rf "$STAGED/content-cache"
 mkdir -p "$SRC/content-cache"
-ln -sfn "$SRC/content-cache" "$TMP/content-cache"
+ln -sfn "$SRC/content-cache" "$STAGED/content-cache"
 
 # The copy must present LG Home's app id to the application manager.
 # It must NOT have class.hidden; a web app with class.hidden is treated as headless
 # by WebAppMgr and will render a pitch black screen.
-"$NODE" - "$TMP/appinfo.json" <<'EOF'
+"$NODE" - "$STAGED/appinfo.json" <<'EOF'
 var fs = require('fs'), file = process.argv[2];
 var app = JSON.parse(fs.readFileSync(file, 'utf8'));
 app.id = 'com.webos.app.home';
@@ -40,8 +40,8 @@ app.handlesRelaunch = false;
 delete app.class;
 fs.writeFileSync(file, JSON.stringify(app, null, 2));
 EOF
-grep -q '"com.webos.app.home"' "$TMP/appinfo.json" || { echo "appinfo rewrite failed" >"$LOG"; exit 0; }
-mount --bind "$TMP" "$DST" || exit 0
+grep -q '"com.webos.app.home"' "$STAGED/appinfo.json" || { echo "appinfo rewrite failed" >"$LOG"; exit 0; }
+mount --bind "$STAGED" "$DST" || exit 0
 
 # The normal launcher app remains installed for its service and data, but stays
 # out of the app list while its content is acting as Home.
@@ -75,6 +75,9 @@ pkill -9 -f app-id=com.webos.app.home >>"$LOG" 2>&1 || true
 
 SVC=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh
 [ -f "$SVC" ] && sh "$SVC" </dev/null >/dev/null 2>&1 && echo "started launcher service" >>"$LOG"
+
+OPT=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/optimize.sh
+[ -f "$OPT" ] && sh "$OPT" on </dev/null >/dev/null 2>&1 && echo "applied system optimizations" >>"$LOG" || true
 
 ORIG="$STATE/boot-input.orig"
 if [ ! -f "$ORIG" ]; then

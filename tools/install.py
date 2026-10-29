@@ -81,4 +81,7 @@ except (RuntimeError, subprocess.TimeoutExpired, TimeoutError, KeyError, ValueEr
 checked('ln -sf /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/screensaver-as-system.sh '
         '/var/lib/webosbrew/init.d/41-gathin-screensaver; '
         'sh /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/screensaver-as-system.sh')
+checked('ln -sf /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/optimize.sh '
+        '/var/lib/webosbrew/init.d/42-gathin-optimize; '
+        'sh /media/developer/apps/usr/palm/services/com.gathin.tvhome.service/optimize.sh on')
 print('Installed as system Home with the OLED screen saver. Check Home, Back from an app, and the screen saver once on your TV.')

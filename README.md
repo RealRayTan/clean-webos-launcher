@@ -4,7 +4,7 @@
 
 为已 root 的 LG webOS 电视提供海报列表中文桌面。桌面以 bind mount 挂成系统 Home，应用退出、短按 Home 和开机都会直接回到它，不再先闪一下 LG 原厂首页；待机唤醒后恢复上次使用的桌面或 HDMI 输入源。桌面跑在电视上，不需要电脑常开。
 
-前端起点是 [webos-vibehack](https://github.com/OmkarK97/webos-vibehack)，本项目增加中文字体回退、电视端按键助手、海报列表首页、系统 Home 挂载、系统屏保替换和共享桌面状态。当前源码与实机版本为 **1.5.8**。
+前端起点是 [webos-vibehack](https://github.com/OmkarK97/webos-vibehack)，本项目增加中文字体回退、电视端按键助手、海报列表首页、系统 Home 挂载、系统屏保替换和共享桌面状态。当前源码与实机版本为 **1.5.9**。
 
 ## 安装
 
@@ -106,7 +106,7 @@ TMDB 封面展示的是平台片库公开精选，不是官方榜单或个人观
 ```sh
 node --test tests/*.cjs
 python3 -m compileall -q tools scripts
-bash -n scripts/build.sh service/autostart.sh service/as-home.sh service/screensaver-as-system.sh
+bash -n scripts/build.sh service/autostart.sh service/as-home.sh service/screensaver-as-system.sh service/optimize.sh
 ```
 
 `app/apps.example.js` 只是占位示例。首次部署前用 `tools/sync-apps.py` 从电视同步真实清单和图标，不要把示例当成设备上的应用列表。左侧“电脑”入口由 `app/config.js` 的 `computerInput` 指定，例如 `com.webos.app.hdmi4`。

@@ -52,7 +52,7 @@ python3 scripts/prepare_native.py /absolute/path/to/native-artifact
 bash scripts/build.sh
 ```
 
-输出为 `build/com.gathin.tvhome_1.5.8_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
+输出为 `build/com.gathin.tvhome_1.5.9_all.ipk`。构建会核对原生依赖 SHA256，并保留未压缩的 JavaScript，便于比对安装文件。构建不连接电视。
 
 ## 安装并启用
 
@@ -69,6 +69,7 @@ bash scripts/build.sh
 5. 保留并恢复原键位配置，关闭原生 Home 适配器，将桌面 bind mount 到 LG 原厂 Home 的 appid，并重启系统应用管理器 `sam`。
 6. 将 `homeAutoLaunch` 设为 `off`，把启动输入指到桌面，注册启动钩子和助手。
 7. 把独立屏保页复制到 `/var/lib/lg-c5-home/screensaver`，bind mount 到 LG 原厂屏保的 appid，注册 `41-gathin-screensaver` 启动钩子。
+8. 执行系统级性能优化与常驻内存减负（`service/optimize.sh`），关闭后台冗余预加载策略、停用安全遥测服务并压制原厂推广，注册 `42-gathin-optimize` 启动钩子。
 
 工具不重启电视。启用后短按 Home、应用退出和开机都会直接到桌面。应用内返回键无法退出时，长按返回约 0.7 秒回到桌面。电视空闲 3 分钟后由系统启动纯黑浮动时钟屏保，任意按键退出。
 

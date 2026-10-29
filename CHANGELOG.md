@@ -1,5 +1,13 @@
 # 版本变化
 
+## 1.5.9 — 2026-10-29
+
+- 挂载源持久化（消除 tmpfs 内存浪费）：将系统 Home 挂载源从 `/tmp` 内存文件系统迁移到闪存持久化目录 `/var/lib/lg-c5-home/system-home`，彻底消除桌面代码与资源对 tmpfs 物理内存的挤占。
+- 后台预加载策略优化：新增 `service/optimize.sh`，通过 `com.webos.service.preloadmanager/setPreloadPolicy` 关闭 YouTube 与 LG Channels 的后台常驻预载策略，应用按需秒开，退出后不再霸占百兆物理内存。
+- 安全级 Debloat 与广告压制：安全停止 `service-logger`、`ai-inference-manager`、`alwaysready` 等 8 个无用后台守护进程；关闭系统级推广横幅、屏保广告与智能提示设置，开启限制广告跟踪（LMT）。
+- 严格安全红线与一键回滚：严格保留 `com.webos.service.sdx` 与 `ss.gateway`，确保系统齿轮设置与局域网投屏绝对不受影响；在 `tools/desktop_mode.py off` 时支持一键恢复预载和启动项。
+- 引导钩子注册：开机自启自动注册 `42-gathin-optimize` 引导钩子，保持系统各优化项的幂等自愈。
+
 ## 1.5.8 — 2026-10-25
 
 - 引入有界 LRU 图片显存池（`app/pool.js`）：提供通用 `ImagePool` 机制，替代原有无界累积的 `preloads` 字典；主页封面限制容量为 8，探索大厅限制容量为 10；超出容量时主动淘汰最久未使用项并执行 `src = ''` 解除 GPU 纹理引用，并在切项淡出完成与唤醒恢复时主动释放非视口纹理。
