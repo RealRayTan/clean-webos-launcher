@@ -189,3 +189,21 @@ HDMI 标签目前使用文字色标，不引入 FreeMyTV 的品牌 logo 素材�
    - 使用 `tools/install.py` 完整打包并推送到 LG OLED42C5XCA，验证系统 Home 挂载与前台渲染。
    - 实机遥控验证：进入探索大厅海报整齐平铺，无浮动跳跃；左右连按货架平移达到满帧 60 FPS，移开焦点后卡片瞬间恢复正常尺寸无残留。
    - 全部 11 组自动化测试套件（58 项测试）全部通过。
+
+## 1.5.9 系统级常驻减负与挂载源持久化实机验收
+
+2026-10-29 针对系统挂载源占用 tmpfs 物理内存与厂商后台进程占用进行实机验收：
+
+1. **挂载源脱离 tmpfs 物理内存**：
+   - `service/as-home.sh` 停止向 `/tmp` 复制桌面静态资源，改为直接在持久化闪存目录 `/var/lib/lg-c5-home/system-home` 暂存与维护。
+   - 电视端实机 `/proc/mounts` 验证：`/usr/palm/applications/com.webos.app.home` 挂载点对应的底层设备为物理闪存分区 `/dev/mmcblk0p58`，桌面资源完全脱离 tmpfs 内存盘，消除物理 RAM 挤占。
+
+2. **后台预加载与服务停用（`service/optimize.sh`）**：
+   - 自动关闭 YouTube（`youtube.leanback.v4`）与 LG Channels（`com.webos.app.lgchannels`）后台常驻预载白名单。
+   - 停止 `service-logger`、`ai-inference-manager`、`alwaysready` 等 8 个无用后台系统守护进程；关闭 `homePromotion`、`screenSaverAd`、`adCookie`、`aiNudge`、`livePromotion` 等推广开关，开启限制广告跟踪。
+   - 开机启动钩子 `/var/lib/webosbrew/init.d/42-gathin-optimize` 链接完成。
+   - 实机 `MemAvailable` 经系统级减负后稳定在近 800 MB（实测 `795,060 kB`），较原厂环境提升显著。
+
+3. **测试覆盖与安全红线守则**：
+   - 严格排除 `com.webos.service.sdx` 与 `ss.gateway`，电视物理齿轮设置菜单与局域网投屏功能经实测完全正常。
+   - 自动化测试增加 `tests/test-optimize.cjs`，全套 12 组自动化测试套件（62 项测试）全部通过。

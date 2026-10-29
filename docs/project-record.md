@@ -100,3 +100,13 @@
 - 引入有界 LRU `ImagePool` 与串行限流 `PreloadQueue`（`app/pool.js`），主页海报限制 8 张常驻，探索大厅限制 10 张，入场 12 部作品改为单任务步进异步解码，切项移动时自动挂起队列；
 - 防抖时间提高至 200ms，轨道位移时长微调至 160ms，货架连续平移不再受到全屏海报解码的抢占打断；
 - 本地 58 项自动化测试全部通过，电视实机完整部署并验证，探索大厅货架滑动达到 60 FPS 满帧水准。
+
+## 1.5.9 吸收 OYG 加固经验与常驻内存深度优化
+
+通过与 `JulioFerrero/own-your-glass` (OYG) 架构对比与深入逆向审计，落实了四项系统级底层减负：
+
+1. **挂载源脱离 tmpfs 物理内存**：`service/as-home.sh` 历史实现将桌面 Web 资源拷贝到 `/tmp/gathin-home-as-home` 后执行 bind mount。因为 webOS 的 `/tmp` 为基于 RAM 的 tmpfs，桌面静态资源（HTML、JS、字体、封面缓存软链）直接常驻挤占物理内存。1.5.9 将其统一规范至持久化闪存目录 `/var/lib/lg-c5-home/system-home`，彻底回收了该部分物理 RAM。
+2. **常驻预加载策略阻断**：LG `com.webos.service.preloadmanager` 默认在后台预加载 YouTube（占用约 60–70 MB）与 LG Channels（占用约 100 MB）。新增 `service/optimize.sh`，通过 `luna://com.webos.service.preloadmanager/setPreloadPolicy` 将其置为 `isEnabled: false`，应用保持秒级冷启能力，但退出后不再常驻吃内存。
+3. **安全级 Debloat 与广告压制**：停用 `service-logger`、`ai-inference-manager`、`alwaysready` 等 8 个无用后台系统守护进程；调用 `setSystemSettings` 关闭 `homePromotion`、`screenSaverAd`、`adCookie`、`aiNudge` 和 `livePromotion`，并开启限制广告跟踪（LMT）。
+4. **安全底线与状态回滚保证**：严格排除 `com.webos.service.sdx`（确保设置菜单不崩溃）与 `ss.gateway`（确保局域网投屏可用）；在 `tools/desktop_mode.py off` 时支持一键恢复预载与服务。实测可用内存稳定在近 800 MB 水准。
+
