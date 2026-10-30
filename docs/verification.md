@@ -84,7 +84,7 @@ Chrome 使用本地验证服务读取此前保存的四路公开缓存，确认�
 
 初次本地验证时尚未取得 TMDB Read Access Token，电视保留 1.2.0。随后通过 GitHub Actions 验证 `TMDB_ACCESS_TOKEN` 与 `TMDB_API_SECRET` 均有效，前者用于电视端读取，后者作为 v3 API Key 验证但未复制到电视。一次性配置通过 CMS 信封加密传输，解密私钥留在 Mac，传输完成后清理私钥和加密临时产物。凭据以 0600 权限保存于电视私有目录。
 
-同日实际安装 1.3.0，应用和服务共 59 个文件的摘要与本地一致。Prime Video 的美国片库返回八条并在电视上缓存封面；Disney 与 HBO 各返回八条元数据。后两者未安装到电视，因此没有宣称完成对应 App 的显示或播放验收。用户当前六个首页应用及其顺序保留。GitHub 检查运行见 https://github.com/RealRayTan/lg-webos-desktop/actions/runs/39645687477 。
+同日实际安装 1.3.0，应用和服务共 59 个文件的摘要与本地一致。Prime Video 的美国片库返回八条并在电视上缓存封面；Disney 与 HBO 各返回八条元数据。后两者未安装到电视，因此没有宣称完成对应 App 的显示或播放验收。用户当前六个首页应用及其顺序保留。GitHub 检查运行见 https://github.com/RealRayTan/clean-webos-launcher/actions/runs/39645687477 。
 
 Prime 动态封面已在 LG C5 实机显示并截图，首页保留六个应用和原顺序；确认后恢复操作前的哔哩哔哩。期间未重启电视、未重复 Home 长短按验证。
 

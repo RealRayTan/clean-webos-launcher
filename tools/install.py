@@ -36,8 +36,8 @@ checked('umount -l /usr/palm/applications/com.webos.app.home 2>/dev/null || true
         'umount -l /usr/palm/applications/com.webos.app.screensaver 2>/dev/null || true')
 scp = ssh_args()
 scp[0] = 'scp'
-subprocess.run(scp[:1] + ['-O'] + scp[1:] + [str(package), ssh_target() + ':/tmp/lg-webos-desktop.ipk'], check=True)
-payload = {'id': 'com.ares.defaultName', 'ipkUrl': '/tmp/lg-webos-desktop.ipk', 'subscribe': True}
+subprocess.run(scp[:1] + ['-O'] + scp[1:] + [str(package), ssh_target() + ':/tmp/clean-webos-launcher.ipk'], check=True)
+payload = {'id': 'com.ares.defaultName', 'ipkUrl': '/tmp/clean-webos-launcher.ipk', 'subscribe': True}
 command = 'luna-send -i -f luna://com.webos.appInstallService/dev/install ' + shlex.quote(json.dumps(payload))
 process = subprocess.Popen(ssh_args() + ['-tt', ssh_target(), command], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 try:
