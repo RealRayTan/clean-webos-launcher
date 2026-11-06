@@ -24,7 +24,6 @@ cp -a "$SRC/." "$STATE/"
 
 mount --bind "$STATE" "$DST" || { echo "screensaver mount failed" >"$LOG"; exit 0; }
 
-# sam caches appinfo.json; restart it so the next launch reads the web app.
-systemctl restart sam >>"$LOG" 2>&1 || true
+pkill -9 -f app-id=com.webos.app.screensaver >>"$LOG" 2>&1 || true
 echo "screensaver mounted" >>"$LOG"
 exit 0

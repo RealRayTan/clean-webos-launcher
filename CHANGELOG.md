@@ -1,5 +1,9 @@
 # 版本变化
 
+## 1.5.11 — 2026-11-06
+
+- 彻底根除开机 30 秒自动抢切桌面缺陷：排查确认系统启动约 38 秒时，Homebrew Channel 触发的 `as-home.sh` 与 `screensaver-as-system.sh` 重启了 `sam`（系统应用管理器）。`sam` 重启导致正在运行的电脑 HDMI 4 会话丢失，`bootd` 因前台变为空而自动重拉 `com.webos.app.home`。现移除自启挂载脚本中的 `systemctl restart sam`，由于 `appinfo.json` 具备 `checkUpdateOnLaunch: true`，bind mount 无需重启 SAM 即可正常由 WebAppMgr 接管，开机电脑信号彻底不受干扰。
+
 ## 1.5.10 — 2026-11-06
 
 - 修复电脑输入源关机开机自动抢切桌面缺陷：修正 `service/resume-state.js` 中下电瞬时空应用 ID（`""`）及屏保误被判定为桌面（`com.webos.app.home`）的缺陷，确保 HDMI 电脑关机开机后稳定保持在电脑输入源，不再异常跳转桌面。

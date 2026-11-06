@@ -70,7 +70,6 @@ try { fs.writeFileSync(file, JSON.stringify(config)); } catch (error) {}
 EOF
 fi
 
-systemctl restart sam >>"$LOG" 2>&1 && echo "restarted sam" >>"$LOG"
 pkill -9 -f app-id=com.webos.app.home >>"$LOG" 2>&1 || true
 
 SVC=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh
