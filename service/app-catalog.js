@@ -48,7 +48,12 @@ exports.register = function (service) {
         return;
       }
       var seen = {};
+      var vpnInstalled = false;
       var apps = payload.launchPoints.filter(function (point) {
+        if (point.id === 'com.alcyone.vpn.singbox' || point.id === 'com.alcyone.vpn') {
+          vpnInstalled = true;
+          return false;
+        }
         if (!point.id || point.hidden || seen[point.id] || point.id === 'com.gathin.tvhome' || /^com\.webos\.app\.(hdmi\d+|livetv)$/.test(point.id)) return false;
         seen[point.id] = true;
         return true;
@@ -58,7 +63,7 @@ exports.register = function (service) {
           iconColor: point.iconColor || point.bgColor || '' };
       });
       if (!seen['com.webos.app.home']) apps.push({ id: 'com.webos.app.home', title: '桌面', icon: 'icons/lg-home.svg', iconColor: '#303038' });
-      finish({ returnValue: true, apps: apps });
+      finish({ returnValue: true, apps: apps, vpnInstalled: vpnInstalled });
     });
   });
 };

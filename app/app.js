@@ -43,6 +43,9 @@
   var KEY = 'tvhome.tiles.v1';
   var computer = CONFIG.computerInput || 'com.webos.app.hdmi4';
   var vpnId = 'com.alcyone.vpn.singbox';
+  var vpnInstalled = false;
+  function isVpnId(id) { return id === 'com.alcyone.vpn.singbox' || id === 'com.alcyone.vpn'; }
+  function hasVpn() { return vpnInstalled || !!catalog.filter(function (app) { return isVpnId(app.id); })[0]; }
   var defaults = ['com.biliwebos.app', 'youtube.leanback.v4', 'netflix', 'com.beb.plxnative', 'com.apple.appletv'];
   var brands = {
     'com.biliwebos.app': { name: '哔哩哔哩', subtitle: '视频与番剧', icon: 'bilibili.svg', style: 'bili' },
@@ -119,7 +122,7 @@
   var vpnRequest = 0;
   document.body.classList.toggle('on-tv', TVDevice.available);
 
-  function homeIds() { return state.apps.filter(function (id) { return !!installed(id); }); }
+  function homeIds() { return state.apps.filter(function (id) { return !isVpnId(id) && !!installed(id); }); }
   function icon(file) { var img = document.createElement('img'); img.src = 'assets/' + file; img.alt = ''; return img; }
   function toast(text) { var el = $('toast'); el.textContent = text; el.classList.add('visible'); clearTimeout(toastTimer); toastTimer = setTimeout(function () { el.classList.remove('visible'); }, 2400); }
   function commit(changes) {
@@ -276,6 +279,7 @@
   function act(action) {
     zone = 'menu'; updateZones();
     if (action === 'all') { openDialog('all'); refreshApps(false); }
+    else if (action === 'trending') openCinema();
     else if (action === 'inputs') openDialog('inputs');
     else if (action === 'settings') openDialog('settings');
     else if (action === 'clean-ram') {
@@ -294,7 +298,7 @@
       });
     }
     else if (action === 'network') {
-      if (installed(vpnId)) launch(vpnId); else launch('com.palm.app.settings', { target: 'network' });
+      if (hasVpn()) launch(vpnId); else launch('com.palm.app.settings', { target: 'network' });
       zone = 'list'; updateZones();
     }
   }
@@ -713,6 +717,7 @@
     TVDevice.listApps(function (result) {
       loadingApps = false;
       var next = result.returnValue && sanitizeApps(result.apps);
+      if (result && result.vpnInstalled !== undefined) vpnInstalled = !!result.vpnInstalled;
       if (!next || !next.length) { if (notify) toast('刷新失败，保留原有列表'); return; }
       var key = document.activeElement && document.activeElement.dataset && document.activeElement.dataset.key;
       var selected = items[index] && items[index].id;
@@ -730,7 +735,7 @@
   function refreshVpn() {
     if (document.hidden) return;
     var label = $('vpnLabel'); if (!label) return;
-    if (!installed(vpnId)) { label.textContent = '打开网络设置'; return; }
+    if (!hasVpn()) { label.textContent = '打开网络设置'; return; }
     if (!TVDevice.available) { label.textContent = 'Alcyone VPN'; return; }
     var request = ++vpnRequest;
     TVDevice.vpnStatus(function (result) {
@@ -780,8 +785,8 @@
     else bar.appendChild(button('编辑桌面', 'choice', 'manage', function () { openDialog('manage'); }));
     bar.appendChild(button('刷新应用', 'choice', 'refresh', function () { refreshApps(true); }));
     var list = document.createElement('div'); list.className = 'app-list'; body.appendChild(list);
-    var rows = catalog.slice();
-    if (manage) state.apps.forEach(function (id) { if (!installed(id)) rows.push({ id: id, title: appInfo(id).name + '（暂不可用）' }); });
+    var rows = catalog.filter(function (app) { return !isVpnId(app.id); });
+    if (manage) state.apps.forEach(function (id) { if (!isVpnId(id) && !installed(id)) rows.push({ id: id, title: appInfo(id).name + '（暂不可用）' }); });
     rows.forEach(function (raw) {
       var app = appInfo(raw.id), selected = state.apps.indexOf(app.id) >= 0;
       var row = document.createElement('button'); row.className = 'list-item'; row.dataset.key = 'list-' + app.id;
@@ -810,7 +815,7 @@
   function renderOrder() {
     paragraph(movingId ? '正在移动：' + appInfo(movingId).name + '。上下调整位置，确认保存，返回取消。' : '选中应用按确认开始移动，再按确认保存。');
     var list = document.createElement('div'); list.className = 'order-list'; body.appendChild(list);
-    (orderDraft || state.apps).forEach(function (id, i) {
+    (orderDraft || state.apps).filter(function (id) { return !isVpnId(id); }).forEach(function (id, i) {
       var row = button('', 'list-item order-item' + (movingId === id ? ' moving' : ''), 'order-' + id, function () {
         if (movingId) {
           if (commit({ apps: orderDraft.slice() })) { orderDraft = null; movingId = null; renderList(); openDialog('order', 'order-' + id); }

@@ -16,7 +16,7 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
     } catch (error) { log('remember screen failed: ' + error.message); }
   }
   function remember(id) {
-    if (!id) return;
+    if (!id || id === 'com.webos.app.screensaver') return;
     if (id !== saved) { saved = id; writes = 0; }
     persist();
   }
@@ -63,8 +63,7 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
       return;
     }
     var id = typeof data.appId === 'string' ? data.appId : '';
-    if (!id && typeof isSystemHome === 'function' && isSystemHome()) id = desktop;
-    if (!id) return;
+    if (!id || id === 'com.webos.app.screensaver') return;
     foreground = id;
     if (phase === 'active') remember(foreground);
   }

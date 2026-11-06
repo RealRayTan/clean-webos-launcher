@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const fs = require('node:fs');
-function scenario(saved, current = 'com.webos.app.hdmi4') {
+function scenario(saved, current = 'com.webos.app.hdmi4', isSystemHome = () => false) {
   let power = { returnValue: true, state: 'Active' }, foreground = current, subscription, tick, stored = saved;
   const launches = [], module = { exports: {} };
   const disk = {
@@ -16,7 +16,7 @@ function scenario(saved, current = 'com.webos.app.hdmi4') {
   vm.runInNewContext(fs.readFileSync('service/resume-state.js', 'utf8'), {
     exports: module.exports, setInterval: fn => { tick = fn; }, setTimeout: () => 1, clearTimeout() {}
   });
-  const status = module.exports.start(service, disk, (reason, done) => { launches.push(reason); foreground = 'com.gathin.tvhome'; done(true); }, () => {}, () => true);
+  const status = module.exports.start(service, disk, (reason, done) => { launches.push(reason); foreground = 'com.gathin.tvhome'; done(true); }, () => {}, () => true, isSystemHome);
   return { launches, status, saved: () => stored,
     foreground(id) { foreground = id; subscription({ payload: { returnValue: true, appId: id } }); },
     power(state, processing) { power = { returnValue: true, state, processing }; tick(); }
@@ -25,6 +25,15 @@ function scenario(saved, current = 'com.webos.app.hdmi4') {
 test('HDMI at shutdown stays on HDMI after wake', () => {
   const s = scenario('com.webos.app.hdmi4'); s.power('Active Standby'); s.power('Active');
   assert.equal(s.launches.length, 0); assert.equal(s.saved(), 'com.webos.app.hdmi4');
+});
+test('HDMI with transient empty foreground or screensaver during shutdown in system-home mode stays on HDMI after wake', () => {
+  const s = scenario('com.webos.app.hdmi4', 'com.webos.app.hdmi4', () => true);
+  s.foreground('');
+  s.foreground('com.webos.app.screensaver');
+  s.power('Suspend');
+  s.power('Active');
+  assert.equal(s.launches.length, 0);
+  assert.equal(s.saved(), 'com.webos.app.hdmi4');
 });
 test('desktop at shutdown restores once despite HDMI notifications while asleep', () => {
   const s = scenario('com.webos.app.hdmi4'); s.foreground('com.gathin.tvhome');
