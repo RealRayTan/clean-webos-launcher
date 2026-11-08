@@ -8,18 +8,26 @@ var LOG = '/tmp/lg-c5-home.log';
 var disabled = '/var/lib/lg-c5-home/disabled';
 var systemHome = '/var/lib/lg-c5-home/system-home';
 var lastLaunch = 0;
-var keyDown = 0, backDown = 0, backTimer = 0;
+var keyDown = 0, backDown = 0, backTimer = 0, homeDown = 0, homeTimer = 0;
 var inputFiles = [];
 function isSystemHome() { return fs.existsSync(systemHome); }
 function target() { return APP; }
 function handleHome(code, value, source) {
   if (code !== 773 && code !== 102) return;
   if (isSystemHome()) {
-    if (keyDown && Date.now() - keyDown > 6000) keyDown = 0;
-    if (value === 1 && !keyDown) keyDown = Date.now();
-    if (value === 0 && keyDown) {
-      var homeDuration = Date.now() - keyDown; keyDown = 0;
-      if (homeDuration < 650) setTimeout(function () {
+    if (value === 1 && !homeDown) {
+      homeDown = Date.now();
+      clearTimeout(homeTimer);
+      homeTimer = setTimeout(function () {
+        if (!homeDown) return;
+        homeDown = 0;
+        if (!enabled()) return;
+        launch('home-hold-' + source);
+      }, 500);
+    } else if (value === 0 && homeDown) {
+      clearTimeout(homeTimer);
+      homeDown = 0;
+      setTimeout(function () {
         if (!enabled()) return;
         launch('home-tap-' + source);
       }, source === 'native' ? 0 : 40);

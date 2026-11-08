@@ -58,17 +58,16 @@ mkdir -p "$STATE"
 touch "$STATE/system-home"
 rm -f "$STATE/native-enabled"
 # Use the original Home key path; the launcher is now the system Home itself.
+mkdir -p /home/root/.config/lginputhook
 if [ -f "$STATE/keybinds.before.json" ]; then
-  mkdir -p /home/root/.config/lginputhook
   cp "$STATE/keybinds.before.json" /home/root/.config/lginputhook/keybinds.json
-else
-  "$NODE" - /home/root/.config/lginputhook/keybinds.json <<'EOF'
+fi
+"$NODE" - /home/root/.config/lginputhook/keybinds.json <<'EOF'
 var fs = require('fs'), file = process.argv[2], config = {};
 try { config = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) {}
 delete config['773'];
-try { fs.writeFileSync(file, JSON.stringify(config)); } catch (error) {}
+try { fs.writeFileSync(file, JSON.stringify(config, null, 2)); } catch (error) {}
 EOF
-fi
 
 SVC=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh
 [ -f "$SVC" ] && sh "$SVC" </dev/null >/dev/null 2>&1 && echo "started launcher service" >>"$LOG"

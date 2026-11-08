@@ -70,6 +70,12 @@ test('system-home short Home from HDMI opens the mounted Home', () => {
   assert.deepEqual(s.launched, ['com.gathin.tvhome']);
 });
 
+test('system-home long Home from HDMI opens custom desktop without black screen drop', () => {
+  const s = scenario({ systemHome: true, foreground: 'com.webos.app.hdmi3' });
+  s.input(773, 1); s.advance(700); s.flush();
+  assert.deepEqual(s.launched, ['com.gathin.tvhome']);
+});
+
 test('system-home short Back from HDMI opens the mounted Home', () => {
   const s = scenario({ systemHome: true, foreground: 'com.webos.app.hdmi3' });
   s.input(158, 1); s.input(158, 0, 120); s.flush();
