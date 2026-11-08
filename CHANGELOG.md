@@ -1,5 +1,9 @@
 # 版本变化
 
+## 1.5.12 — 2026-11-08
+
+- 彻底修复开机抢切桌面与下电持久化状态污染：在 `service/resume-state.js` 中接入 `tvpower/getPowerState` 实时订阅，消除 1 秒轮询延迟导致的下电瞬态撕裂；在输入源为物理 HDMI 时严格拦截系统下电/信号中断触发的 `com.webos.app.home` 兜底回退事件，仅响应用户显式按键导航；移除 `as-home.sh` 与 `screensaver-as-system.sh` 中的开机 `pkill -9` 强杀逻辑，避免 SAM 误判崩溃并重拉桌面；移除屏保退出事件向服务硬编码派发的 `open` 唤起，确保 HDMI 信号无缝保持。
+
 ## 1.5.11 — 2026-11-06
 
 - 彻底根除开机 30 秒自动抢切桌面缺陷：排查确认系统启动约 38 秒时，Homebrew Channel 触发的 `as-home.sh` 与 `screensaver-as-system.sh` 重启了 `sam`（系统应用管理器）。`sam` 重启导致正在运行的电脑 HDMI 4 会话丢失，`bootd` 因前台变为空而自动重拉 `com.webos.app.home`。现移除自启挂载脚本中的 `systemctl restart sam`，由于 `appinfo.json` 具备 `checkUpdateOnLaunch: true`，bind mount 无需重启 SAM 即可正常由 WebAppMgr 接管，开机电脑信号彻底不受干扰。

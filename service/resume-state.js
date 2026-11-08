@@ -15,8 +15,17 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
       log('remember screen: ' + saved);
     } catch (error) { log('remember screen failed: ' + error.message); }
   }
+  var userNavigated = false;
+  function isPhysicalInput(id) {
+    return /^com\.webos\.app\.(hdmi[1-4]|livetv)$/.test(id);
+  }
+  function isDesktopId(id) {
+    return id === desktop || id === 'com.webos.app.home' || id === 'com.gathin.tvhome';
+  }
   function remember(id) {
     if (!id || id === 'com.webos.app.screensaver') return;
+    if (isPhysicalInput(saved) && id === 'com.webos.app.home' && !userNavigated) return;
+    userNavigated = false;
     if (id !== saved) { saved = id; writes = 0; }
     persist();
   }
@@ -25,6 +34,7 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
     operation = null;
   }
   function restore() {
+    if (phase === 'restoring') return;
     if (attempts >= 3) { phase = 'failed'; return; }
     attempts++;
     phase = 'restoring';
@@ -64,6 +74,7 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
     }
     var id = typeof data.appId === 'string' ? data.appId : '';
     if (!id || id === 'com.webos.app.screensaver') return;
+    if (isPhysicalInput(saved) && id === 'com.webos.app.home' && !userNavigated) return;
     foreground = id;
     if (phase === 'active') remember(foreground);
   }
@@ -96,5 +107,13 @@ exports.start = function (service, fs, launch, log, enabled, isSystemHome) {
     });
   }
   poll(); setInterval(poll, 1000);
-  return function () { return { phase: phase, lastScreen: saved, persistedScreen: committed, persistencePending: saved !== committed }; };
+  var statusFn = function () {
+    return { phase: phase, lastScreen: saved, persistedScreen: committed, persistencePending: saved !== committed };
+  };
+  statusFn.setDesktop = function () {
+    saved = desktop;
+    writes = 0;
+    persist();
+  };
+  return statusFn;
 };

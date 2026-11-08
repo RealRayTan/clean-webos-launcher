@@ -24,6 +24,5 @@ cp -a "$SRC/." "$STATE/"
 
 mount --bind "$STATE" "$DST" || { echo "screensaver mount failed" >"$LOG"; exit 0; }
 
-pkill -9 -f app-id=com.webos.app.screensaver >>"$LOG" 2>&1 || true
 echo "screensaver mounted" >>"$LOG"
 exit 0

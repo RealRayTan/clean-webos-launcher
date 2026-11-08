@@ -77,6 +77,11 @@ function handleKey(code, value, source) {
 function log(message) { fs.appendFileSync(LOG, new Date().toISOString() + ' ' + message + '\n'); }
 function enabled() { return !fs.existsSync(disabled); }
 function launch(reason, done) {
+  if (resumeStatus && typeof resumeStatus.setDesktop === 'function') {
+    if (reason.indexOf('home-tap') === 0 || reason.indexOf('back-') === 0 || reason === 'requested') {
+      resumeStatus.setDesktop();
+    }
+  }
   if (!enabled() || (reason !== 'return-from-app' && Date.now() - lastLaunch < 800)) { if (done) done(false); return; }
   lastLaunch = Date.now();
   var finished = false;

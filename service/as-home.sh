@@ -70,8 +70,6 @@ try { fs.writeFileSync(file, JSON.stringify(config)); } catch (error) {}
 EOF
 fi
 
-pkill -9 -f app-id=com.webos.app.home >>"$LOG" 2>&1 || true
-
 SVC=/media/developer/apps/usr/palm/services/com.gathin.tvhome.service/autostart.sh
 [ -f "$SVC" ] && sh "$SVC" </dev/null >/dev/null 2>&1 && echo "started launcher service" >>"$LOG"
 
