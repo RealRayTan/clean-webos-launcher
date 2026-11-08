@@ -19,8 +19,16 @@
   SSH 下直接执行 `luna-send` 易被系统 Hub ACL 静默过滤无输出。涉及系统总线调用时，使用交互模式（`-i` / 伪终端 `-tt`），或参考 `webos-tv-kit` 的 `tv_luna.py`（端口 23）调用。
 - **物理输入源保护**：
   系统 `lastInputApp` 和 `physicalLastInputApp` 只能设置为物理 HDMI 接口（如 `com.webos.app.hdmi4`），严禁设置为非法的应用 ID 或 `com.webos.app.livetv`，避免广播进程常驻抢占硬件多媒体通道。
+- **严禁重启 `sam` 与强杀系统核心进程**：
+  `sam`（系统应用管理器）管理整机显示会话。开机或前台运行中重启 `sam` 会直接摧毁活跃的 HDMI 会话并导致 `bootd` 强制重拉桌面。自启挂载脚本严禁执行 `systemctl restart sam`。严禁对 `com.webos.app.home` 与 `com.webos.app.screensaver` 执行 `pkill -9`，避免触发系统应用管理器的崩溃拉回守护。
+- **系统 Home 模式长按 HOME 抢占接管**：
+  系统 Home 挂载模式通过 bind mount 覆盖原厂主页。原厂 Flutter 桌面文件在挂载生效期间不可执行。严禁将长按 HOME 事件放行给底层 webOS。后台服务在 HOME 键按下达 500 毫秒时必须抢占拉起自建桌面，防止 LSM 视窗合成器触发原厂最近任务面板并导致死黑屏和按键假死。
+- **输入源状态单向保护**：
+  当前台为物理 HDMI 时，关机下电与信号丢失触发的系统 `com.webos.app.home` 回退事件属于操作系统默认行为。状态持久化层必须严格过滤该事件。仅在用户通过遥控器按键显式发起导航时，才允许将持久化状态更新为桌面。
+- **核心系统依赖保护**：
+  系统级优化和守护管理严禁停止 `com.webos.service.sdx`、`ss.gateway` 与 `connman`。停止 `sdx` 会导致齿轮设置无法呼出，停止 `ss.gateway` 会导致设备投屏发现失效。
 - **防止屏保覆盖播放**：
-  第三方 Web 视频播放器不会自动重置系统闲置定时器。涉及播放状态保护时，订阅 `luna://com.webos.service.tvpower/power/registerScreenSaverRequest` 并回复 `ack: false`，绝不可修改全局 `screenSaverTimer`（必须保留原厂 3 分钟 OLED 防烧屏保护）。
+  第三方 Web 视频播放器不会自动重置系统闲置定时器。涉及播放状态保护时，订阅 `luna://com.webos.service.tvpower/power/registerScreenSaverRequest` 并回复 `ack: false`，绝不可修改全局 `screenSaverTimer`（必须保留原厂 3 分钟 OLED 防烧屏保护）。屏保退出时严禁向服务派发 `open` 强制唤起桌面。
 
 ## 前端渲染与动效规范（低功耗电视优化）
 
